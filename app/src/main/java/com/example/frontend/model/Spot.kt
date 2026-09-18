@@ -34,13 +34,7 @@ data class PeerReview(
     val helpfulCount: Int,
 )
 
-/**
- * A single campus food spot. This is the one model behind every card in the
- * app: the For You feed and Saved Places both render the same [Spot]s, just
- * filtered differently. `isSaved` is the source of truth for whether a spot
- * shows up in Saved Places, and is toggled by the heart button on the card
- * regardless of which screen it's tapped from.
- */
+// isSaved decide si el spot aparece en la pestaña Saved.
 data class Spot(
     val id: String,
     val emoji: String,

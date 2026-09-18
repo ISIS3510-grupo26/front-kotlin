@@ -35,12 +35,6 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.model.Spot
 import com.example.frontend.ui.theme.AppColors
 
-/**
- * The single card representation used everywhere a [Spot] is shown, in both
- * the For You feed and Saved Places. Tapping the heart toggles
- * `Spot.isSaved` — which is the same flag Saved Places filters on — so
- * saving a spot from the feed makes it show up there immediately.
- */
 @Composable
 fun SpotCard(
     spot: Spot,

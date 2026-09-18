@@ -38,13 +38,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Hosts the four main tabs and owns the single list of [Spot]s shared by
- * the For You feed and Saved Places, so toggling the heart on a card in
- * either screen updates the same underlying saved state. Mirrors the
- * Flutter version's HomeShell: a `selectedSpot` set to non-null acts as a
- * one-level navigation stack for the detail screen.
- */
+// Dueño del estado compartido (lista de spots + tab activo + spot abierto).
 @Composable
 fun CampusBitesApp() {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }

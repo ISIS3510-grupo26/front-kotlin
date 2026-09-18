@@ -2,7 +2,6 @@ package com.example.frontend.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// CampusBites design system colors.
 object AppColors {
     val tomato = Color(0xFFDD5E45)
     val tomatoLight = Color(0xFFFCEEEA)
