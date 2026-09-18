@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.ui.theme.AppColors
+import com.example.frontend.model.TasteProfile
 
 private data class TasteTag(val label: String, val active: Boolean)
 private data class Badge(val emoji: String, val label: String, val color: Color, val unlocked: Boolean)
@@ -66,7 +67,7 @@ private val badges = listOf(
 )
 
 @Composable
-fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier) {
+fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier, perfil: TasteProfile, alEditarGusto: () -> Unit) {
     val unlocked = badges.count { it.unlocked }
 
     LazyColumn(
@@ -99,14 +100,20 @@ fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier) {
         item {
             Column(modifier = Modifier.padding(top = 24.dp)) {
                 TituloSeccion(title = "Taste Profile") {
-                    Text("Edit", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.tomato)
+                    Text(
+                        "Edit",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.tomato,
+                        modifier = Modifier.clickable { alEditarGusto() },
+                    )
                 }
                 Spacer(Modifier.size(10.dp))
                 androidx.compose.foundation.layout.FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    tasteTags.forEach { tag -> ChipGusto(tag.label, tag.active) }
+                    perfil.chips.forEach { chip -> ChipGusto(chip, true) }
                 }
             }
         }
