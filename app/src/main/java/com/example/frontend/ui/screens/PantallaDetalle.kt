@@ -60,9 +60,10 @@ fun PantallaDetalle(
     spot: Spot,
     alMarcarGuardado: (String) -> Unit,
     alVolver: () -> Unit,
+    alEscribirResena: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isSaved by remember(spot.id) { mutableStateOf(spot.isSaved) }
+    var isSaved by remember { mutableStateOf(spot.isSaved) }
 
     Scaffold(
         modifier = modifier,
@@ -125,7 +126,22 @@ fun PantallaDetalle(
             if (spot.reviews.isEmpty()) {
                 item { Text("No reviews yet. Be the first!", color = AppColors.muted, modifier = Modifier.padding(vertical = 12.dp)) }
             }
-            item { Spacer(Modifier.size(24.dp)) }
+            item {
+                Spacer(Modifier.size(6.dp))
+                Button(
+                    onClick = alEscribirResena,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppColors.tomatoLight,
+                        contentColor = AppColors.tomato,
+                    ),
+                ) {
+                    Icon(Icons.Filled.Star, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text("  Write a Review", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Spacer(Modifier.size(24.dp))
+            }
         }
     }
 }
