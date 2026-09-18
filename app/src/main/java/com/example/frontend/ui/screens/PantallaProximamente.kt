@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
-fun ComingSoonScreen(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun PantallaProximamente(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,

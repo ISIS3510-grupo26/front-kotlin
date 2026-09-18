@@ -19,18 +19,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.Spot
 import com.example.frontend.model.SpotCategory
-import com.example.frontend.ui.components.PillChip
-import com.example.frontend.ui.components.SpotList
+import com.example.frontend.ui.components.ChipPildora
+import com.example.frontend.ui.components.ListaSitios
 import com.example.frontend.ui.theme.AppColors
 
 // null representa "All Saved".
 private val categoryTabs: List<SpotCategory?> = listOf(null) + SpotCategory.entries
 
 @Composable
-fun FavoritesScreen(
+fun PantallaGuardados(
     spots: List<Spot>,
-    onToggleSaved: (String) -> Unit,
-    onOpenSpot: (Spot) -> Unit,
+    alMarcarGuardado: (String) -> Unit,
+    alAbrirSitio: (Spot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selected by rememberSaveable { mutableStateOf<SpotCategory?>(null) }
@@ -40,27 +40,27 @@ fun FavoritesScreen(
     val visible = selected?.let { category -> favorites.filter { it.category == category } } ?: favorites
 
     Column(modifier = modifier.fillMaxSize()) {
-        FavoritesHeader(
+        EncabezadoGuardados(
             total = favorites.size,
-            countFor = { category -> category?.let { countByCategory[it] ?: 0 } ?: favorites.size },
+            contarPor = { category -> category?.let { countByCategory[it] ?: 0 } ?: favorites.size },
             selected = selected,
-            onSelect = { selected = it },
+            alElegir = { selected = it },
         )
-        SpotList(
+        ListaSitios(
             spots = visible,
-            emptyMessage = "No saved places in this category yet.",
-            onToggleSaved = onToggleSaved,
-            onOpenSpot = onOpenSpot,
+            mensajeVacio = "No saved places in this category yet.",
+            alMarcarGuardado = alMarcarGuardado,
+            alAbrirSitio = alAbrirSitio,
         )
     }
 }
 
 @Composable
-private fun FavoritesHeader(
+private fun EncabezadoGuardados(
     total: Int,
-    countFor: (SpotCategory?) -> Int,
+    contarPor: (SpotCategory?) -> Int,
     selected: SpotCategory?,
-    onSelect: (SpotCategory?) -> Unit,
+    alElegir: (SpotCategory?) -> Unit,
 ) {
     Column(modifier = Modifier.padding(top = 12.dp)) {
         Text(
@@ -82,11 +82,11 @@ private fun FavoritesHeader(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(categoryTabs) { category ->
-                PillChip(
+                ChipPildora(
                     text = category?.label ?: "All Saved",
-                    count = countFor(category),
+                    count = contarPor(category),
                     selected = selected == category,
-                    onClick = { onSelect(category) },
+                    onClick = { alElegir(category) },
                 )
             }
         }

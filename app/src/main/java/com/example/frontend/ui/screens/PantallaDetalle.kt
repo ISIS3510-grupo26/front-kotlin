@@ -56,10 +56,10 @@ import com.example.frontend.model.Spot
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
-fun SpotDetailScreen(
+fun PantallaDetalle(
     spot: Spot,
-    onToggleSaved: (String) -> Unit,
-    onBack: () -> Unit,
+    alMarcarGuardado: (String) -> Unit,
+    alVolver: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var isSaved by remember(spot.id) { mutableStateOf(spot.isSaved) }
@@ -68,12 +68,12 @@ fun SpotDetailScreen(
         modifier = modifier,
         containerColor = AppColors.cream,
         bottomBar = {
-            BottomActionBar(
+            BarraAcciones(
                 isSaved = isSaved,
                 walkLabel = spot.distance.replace(" walk", ""),
-                onToggleSaved = {
+                alMarcarGuardado = {
                     isSaved = !isSaved
-                    onToggleSaved(spot.id)
+                    alMarcarGuardado(spot.id)
                 },
             )
         },
@@ -84,25 +84,25 @@ fun SpotDetailScreen(
                 .padding(innerPadding),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         ) {
-            item { Header(spot = spot, onBack = onBack) }
+            item { Encabezado(spot = spot, alVolver = alVolver) }
             if (spot.uniCardPerk != null) {
                 item {
                     Spacer(Modifier.size(4.dp))
-                    PerkCard(text = spot.uniCardPerk)
+                    TarjetaBeneficio(text = spot.uniCardPerk)
                     Spacer(Modifier.size(22.dp))
                 }
             }
             item {
-                SectionTitle(
+                TituloSeccion(
                     title = "Full Campus Menu",
                     subtitle = "Affordable student rates with valid UniCard",
                 ) {
-                    CountPill("${spot.menu.size} items")
+                    PildoraContador("${spot.menu.size} items")
                 }
                 Spacer(Modifier.size(12.dp))
             }
             items(spot.menu) { item ->
-                MenuTile(item)
+                FilaMenu(item)
                 Spacer(Modifier.size(10.dp))
             }
             if (spot.menu.isEmpty()) {
@@ -110,7 +110,7 @@ fun SpotDetailScreen(
             }
             item {
                 Spacer(Modifier.size(4.dp))
-                SectionTitle(
+                TituloSeccion(
                     title = "Student Peer Reviews",
                     subtitle = "Community feedback from verified campus diners",
                 ) {
@@ -119,7 +119,7 @@ fun SpotDetailScreen(
                 Spacer(Modifier.size(12.dp))
             }
             items(spot.reviews) { review ->
-                ReviewCard(review)
+                TarjetaResena(review)
                 Spacer(Modifier.size(10.dp))
             }
             if (spot.reviews.isEmpty()) {
@@ -131,9 +131,9 @@ fun SpotDetailScreen(
 }
 
 @Composable
-private fun Header(spot: Spot, onBack: () -> Unit) {
+private fun Encabezado(spot: Spot, alVolver: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = alVolver) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = AppColors.espresso)
         }
         Column(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
@@ -170,7 +170,7 @@ private fun Header(spot: Spot, onBack: () -> Unit) {
 }
 
 @Composable
-private fun PerkCard(text: String) {
+private fun TarjetaBeneficio(text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -205,7 +205,7 @@ private fun PerkCard(text: String) {
 }
 
 @Composable
-private fun SectionTitle(title: String, subtitle: String, trailing: @Composable () -> Unit) {
+private fun TituloSeccion(title: String, subtitle: String, trailing: @Composable () -> Unit) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.espresso, modifier = Modifier.weight(1f))
@@ -216,14 +216,14 @@ private fun SectionTitle(title: String, subtitle: String, trailing: @Composable 
 }
 
 @Composable
-private fun CountPill(label: String) {
+private fun PildoraContador(label: String) {
     Box(modifier = Modifier.background(AppColors.tomatoLight, RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AppColors.tomato)
     }
 }
 
 @Composable
-private fun MenuTile(item: MenuItem) {
+private fun FilaMenu(item: MenuItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -269,7 +269,7 @@ private fun MenuTile(item: MenuItem) {
 }
 
 @Composable
-private fun ReviewCard(review: PeerReview) {
+private fun TarjetaResena(review: PeerReview) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -300,7 +300,7 @@ private fun ReviewCard(review: PeerReview) {
                 }
                 Text(review.program, fontSize = 11.sp, color = AppColors.muted)
             }
-            Stars(count = review.stars)
+            Estrellas(count = review.stars)
         }
         Text(
             "\"${review.text}\"",
@@ -318,7 +318,7 @@ private fun ReviewCard(review: PeerReview) {
 }
 
 @Composable
-private fun Stars(count: Int) {
+private fun Estrellas(count: Int) {
     Row {
         repeat(5) { i ->
             Icon(
@@ -332,14 +332,14 @@ private fun Stars(count: Int) {
 }
 
 @Composable
-private fun BottomActionBar(isSaved: Boolean, walkLabel: String, onToggleSaved: () -> Unit) {
+private fun BarraAcciones(isSaved: Boolean, walkLabel: String, alMarcarGuardado: () -> Unit) {
     Surface(color = AppColors.card, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
-                onClick = onToggleSaved,
+                onClick = alMarcarGuardado,
                 modifier = Modifier.size(48.dp).background(AppColors.tomatoLight, RoundedCornerShape(14.dp)),
             ) {
                 Icon(

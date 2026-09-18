@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
-fun PillChip(
+fun ChipPildora(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -34,7 +34,7 @@ fun PillChip(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             )
         },
-        trailingIcon = count?.let { { CountBadge(it, selected) } },
+        trailingIcon = count?.let { { Contador(it, selected) } },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = AppColors.card,
             labelColor = AppColors.espresso,
@@ -51,7 +51,7 @@ fun PillChip(
 }
 
 @Composable
-private fun CountBadge(count: Int, selected: Boolean) {
+private fun Contador(count: Int, selected: Boolean) {
     Text(
         "$count",
         fontSize = 10.sp,

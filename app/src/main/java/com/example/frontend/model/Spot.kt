@@ -62,7 +62,7 @@ data class Spot(
     val cuisine: String get() = subtitle.split(" • ").first()
     val location: String get() = subtitle.split(" • ").last()
 
-    fun matchesFilter(filter: FeedFilterType): Boolean = when (filter) {
+    fun cumpleFiltro(filter: FeedFilterType): Boolean = when (filter) {
         FeedFilterType.IN_A_RUSH -> walkMinutes < 10
         FeedFilterType.BUDGET -> isBudget
         FeedFilterType.SHORT_WALK -> walkMinutes <= 5
