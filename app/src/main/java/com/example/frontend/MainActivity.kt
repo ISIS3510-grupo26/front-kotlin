@@ -20,9 +20,9 @@ import com.example.frontend.model.Spot
 import com.example.frontend.ui.components.BottomTab
 import com.example.frontend.ui.components.CampusBottomNavBar
 import com.example.frontend.ui.screens.ComingSoonScreen
-import com.example.frontend.ui.screens.ForYouScreen
+import com.example.frontend.ui.screens.FavoritesScreen
+import com.example.frontend.ui.screens.FeedScreen
 import com.example.frontend.ui.screens.ProfileScreen
-import com.example.frontend.ui.screens.SavedPlacesScreen
 import com.example.frontend.ui.screens.SpotDetailScreen
 import com.example.frontend.ui.theme.FrontEndTheme
 
@@ -71,7 +71,7 @@ fun CampusBitesApp() {
             .padding(top = innerPadding.calculateTopPadding())
 
         when (currentTab) {
-            BottomTab.FOR_YOU -> ForYouScreen(
+            BottomTab.FOR_YOU -> FeedScreen(
                 spots = spots,
                 onToggleSaved = ::toggleSaved,
                 onOpenSpot = openSpot,
@@ -82,7 +82,7 @@ fun CampusBitesApp() {
                 icon = Icons.Filled.Map,
                 modifier = contentModifier,
             )
-            BottomTab.SAVED -> SavedPlacesScreen(
+            BottomTab.SAVED -> FavoritesScreen(
                 spots = spots,
                 onToggleSaved = ::toggleSaved,
                 onOpenSpot = openSpot,
