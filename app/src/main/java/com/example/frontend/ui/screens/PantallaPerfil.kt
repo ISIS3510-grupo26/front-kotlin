@@ -66,7 +66,7 @@ private val badges = listOf(
 )
 
 @Composable
-fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
+fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier) {
     val unlocked = badges.count { it.unlocked }
 
     LazyColumn(
@@ -90,7 +90,7 @@ fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
         }
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Avatar()
+                FotoPerfil()
                 Spacer(Modifier.size(14.dp))
                 Text("Julian Bierez", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.espresso)
                 Text("Universidad de los Andes", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.muted)
@@ -98,7 +98,7 @@ fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
         }
         item {
             Column(modifier = Modifier.padding(top = 24.dp)) {
-                SectionHeader(title = "Taste Profile") {
+                TituloSeccion(title = "Taste Profile") {
                     Text("Edit", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.tomato)
                 }
                 Spacer(Modifier.size(10.dp))
@@ -106,25 +106,25 @@ fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    tasteTags.forEach { tag -> TasteChip(tag.label, tag.active) }
+                    tasteTags.forEach { tag -> ChipGusto(tag.label, tag.active) }
                 }
             }
         }
         item {
             Row(modifier = Modifier.fillMaxWidth().padding(top = 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard(value = "13", label = "Places\nTasted", modifier = Modifier.weight(1f))
-                StatCard(value = "$savedCount", label = "Saved\nSpots", modifier = Modifier.weight(1f))
-                StatCard(value = "#3", label = "Campus\nBadges", valueColor = AppColors.tomato, modifier = Modifier.weight(1f))
+                TarjetaDato(value = "13", label = "Places\nTasted", modifier = Modifier.weight(1f))
+                TarjetaDato(value = "$savedCount", label = "Saved\nSpots", modifier = Modifier.weight(1f))
+                TarjetaDato(value = "#3", label = "Campus\nBadges", valueColor = AppColors.tomato, modifier = Modifier.weight(1f))
             }
         }
         item {
             Column(modifier = Modifier.padding(top = 24.dp)) {
-                SectionHeader(title = "Achievements & Badges") {
+                TituloSeccion(title = "Achievements & Badges") {
                     Text("$unlocked of ${badges.size} Unlocked", fontSize = 12.sp, color = AppColors.muted)
                 }
                 Spacer(Modifier.size(12.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(badges) { badge -> BadgeItem(badge) }
+                    items(badges) { badge -> Insignia(badge) }
                 }
             }
         }
@@ -133,20 +133,20 @@ fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                SettingsTile(
+                FilaOpcion(
                     icon = Icons.Filled.RestaurantMenu,
                     iconColor = AppColors.tomato,
                     iconBackground = AppColors.tomatoLight,
                     title = "Dietary Preferences",
                 )
-                SettingsTile(
+                FilaOpcion(
                     icon = Icons.Filled.CreditCard,
                     iconColor = AppColors.mint,
                     iconBackground = AppColors.mintLight,
                     title = "Campus Dining Card (UniCard)",
                     subtitle = "Connected • \$42.500 COP balance",
                 )
-                SettingsTile(
+                FilaOpcion(
                     icon = Icons.Filled.NotificationsNone,
                     iconColor = AppColors.espresso,
                     iconBackground = AppColors.surface,
@@ -158,7 +158,7 @@ fun ProfileScreen(savedCount: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Avatar() {
+private fun FotoPerfil() {
     Box(contentAlignment = Alignment.BottomEnd) {
         Box(
             modifier = Modifier
@@ -182,7 +182,7 @@ private fun Avatar() {
 }
 
 @Composable
-private fun SectionHeader(title: String, trailing: @Composable () -> Unit) {
+private fun TituloSeccion(title: String, trailing: @Composable () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
@@ -196,7 +196,7 @@ private fun SectionHeader(title: String, trailing: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TasteChip(label: String, active: Boolean) {
+private fun ChipGusto(label: String, active: Boolean) {
     Box(
         modifier = Modifier
             .background(if (active) AppColors.tomato else AppColors.card, RoundedCornerShape(999.dp))
@@ -208,7 +208,7 @@ private fun TasteChip(label: String, active: Boolean) {
 }
 
 @Composable
-private fun StatCard(value: String, label: String, modifier: Modifier = Modifier, valueColor: Color = AppColors.espresso) {
+private fun TarjetaDato(value: String, label: String, modifier: Modifier = Modifier, valueColor: Color = AppColors.espresso) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
@@ -227,7 +227,7 @@ private fun StatCard(value: String, label: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun BadgeItem(badge: Badge) {
+private fun Insignia(badge: Badge) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(68.dp)) {
         Box(
             modifier = Modifier
@@ -255,7 +255,7 @@ private fun BadgeItem(badge: Badge) {
 }
 
 @Composable
-private fun SettingsTile(
+private fun FilaOpcion(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconColor: Color,
     iconBackground: Color,

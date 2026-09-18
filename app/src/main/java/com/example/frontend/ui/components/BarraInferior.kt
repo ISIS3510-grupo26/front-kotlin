@@ -33,9 +33,9 @@ enum class BottomTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun CampusBottomNavBar(
+fun BarraInferior(
     current: BottomTab,
-    onSelect: (BottomTab) -> Unit,
+    alElegir: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(color = AppColors.card, shadowElevation = 8.dp, modifier = modifier) {
@@ -46,14 +46,14 @@ fun CampusBottomNavBar(
             horizontalArrangement = Arrangement.SpaceAround,
         ) {
             BottomTab.entries.forEach { tab ->
-                NavItem(tab = tab, active = tab == current, onClick = { onSelect(tab) })
+                ItemBarra(tab = tab, active = tab == current, onClick = { alElegir(tab) })
             }
         }
     }
 }
 
 @Composable
-private fun NavItem(tab: BottomTab, active: Boolean, onClick: () -> Unit) {
+private fun ItemBarra(tab: BottomTab, active: Boolean, onClick: () -> Unit) {
     val color = if (active) AppColors.tomato else AppColors.espresso
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -18,45 +18,45 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.FeedFilterType
 import com.example.frontend.model.Spot
-import com.example.frontend.ui.components.PillChip
-import com.example.frontend.ui.components.SpotList
+import com.example.frontend.ui.components.ChipPildora
+import com.example.frontend.ui.components.ListaSitios
 import com.example.frontend.ui.theme.AppColors
 
 @Stable
-class FeedFilters(initial: Collection<FeedFilterType>) {
+class FiltrosFeed(initial: Collection<FeedFilterType>) {
     private val active = mutableStateListOf<FeedFilterType>().apply { addAll(initial) }
 
-    fun isActive(filter: FeedFilterType) = filter in active
+    fun estaActivo(filter: FeedFilterType) = filter in active
 
-    fun toggle(filter: FeedFilterType) {
+    fun alternar(filter: FeedFilterType) {
         if (!active.remove(filter)) active.add(filter)
     }
 
-    fun apply(spots: List<Spot>) = spots.filter { spot -> active.all(spot::matchesFilter) }
+    fun filtrar(spots: List<Spot>) = spots.filter { spot -> active.all(spot::cumpleFiltro) }
 }
 
 @Composable
-fun FeedScreen(
+fun PantallaParaTi(
     spots: List<Spot>,
-    onToggleSaved: (String) -> Unit,
-    onOpenSpot: (Spot) -> Unit,
+    alMarcarGuardado: (String) -> Unit,
+    alAbrirSitio: (Spot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val filters = remember { FeedFilters(listOf(FeedFilterType.IN_A_RUSH)) }
+    val filters = remember { FiltrosFeed(listOf(FeedFilterType.IN_A_RUSH)) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        FeedHeader(filters)
-        SpotList(
-            spots = filters.apply(spots),
-            emptyMessage = "No spots match these filters yet.",
-            onToggleSaved = onToggleSaved,
-            onOpenSpot = onOpenSpot,
+        EncabezadoParaTi(filters)
+        ListaSitios(
+            spots = filters.filtrar(spots),
+            mensajeVacio = "No spots match these filters yet.",
+            alMarcarGuardado = alMarcarGuardado,
+            alAbrirSitio = alAbrirSitio,
         )
     }
 }
 
 @Composable
-private fun FeedHeader(filters: FeedFilters) {
+private fun EncabezadoParaTi(filters: FiltrosFeed) {
     Column(modifier = Modifier.padding(top = 8.dp)) {
         Text(
             "CampusBites",
@@ -85,10 +85,10 @@ private fun FeedHeader(filters: FeedFilters) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(FeedFilterType.entries) { filter ->
-                PillChip(
+                ChipPildora(
                     text = filter.label,
-                    selected = filters.isActive(filter),
-                    onClick = { filters.toggle(filter) },
+                    selected = filters.estaActivo(filter),
+                    onClick = { filters.alternar(filter) },
                 )
             }
         }

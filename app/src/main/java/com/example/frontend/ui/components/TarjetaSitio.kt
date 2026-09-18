@@ -36,9 +36,9 @@ import com.example.frontend.model.Spot
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
-fun SpotCard(
+fun TarjetaSitio(
     spot: Spot,
-    onToggleSaved: () -> Unit,
+    alMarcarGuardado: () -> Unit,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -57,17 +57,17 @@ fun SpotCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (spot.isSaved) {
-                    Pill(color = AppColors.mint) {
+                    Pildora(color = AppColors.mint) {
                         Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Saved", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    Pill(color = AppColors.tomato) {
+                    Pildora(color = AppColors.tomato) {
                         Text("${spot.affinityPercent}%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
-                IconButton(onClick = onToggleSaved) {
+                IconButton(onClick = alMarcarGuardado) {
                     Icon(
                         imageVector = if (spot.isSaved) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (spot.isSaved) "Remove from saved" else "Save this spot",
@@ -102,9 +102,9 @@ fun SpotCard(
                         Icon(Icons.Filled.Star, contentDescription = null, tint = AppColors.tomato, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(2.dp))
                         Text("${spot.rating}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = AppColors.tomato)
-                        MetaDot()
+                        Puntito()
                         Text(spot.price, fontSize = 12.sp, color = AppColors.espresso)
-                        MetaDot()
+                        Puntito()
                         Text(spot.distance, fontSize = 12.sp, color = AppColors.muted)
                     }
                 }
@@ -137,7 +137,7 @@ fun SpotCard(
 }
 
 @Composable
-private fun Pill(color: Color, content: RowScopeReceiver) {
+private fun Pildora(color: Color, content: RowScopeReceiver) {
     Row(
         modifier = Modifier
             .background(color, RoundedCornerShape(999.dp))
@@ -148,7 +148,7 @@ private fun Pill(color: Color, content: RowScopeReceiver) {
 }
 
 @Composable
-private fun MetaDot() {
+private fun Puntito() {
     Text(" • ", color = AppColors.muted, fontSize = 12.sp)
 }
 

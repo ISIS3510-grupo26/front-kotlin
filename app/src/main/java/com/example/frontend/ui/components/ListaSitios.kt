@@ -15,16 +15,16 @@ import com.example.frontend.model.Spot
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
-fun SpotList(
+fun ListaSitios(
     spots: List<Spot>,
-    emptyMessage: String,
-    onToggleSaved: (String) -> Unit,
-    onOpenSpot: (Spot) -> Unit,
+    mensajeVacio: String,
+    alMarcarGuardado: (String) -> Unit,
+    alAbrirSitio: (Spot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (spots.isEmpty()) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(emptyMessage, color = AppColors.muted)
+            Text(mensajeVacio, color = AppColors.muted)
         }
         return
     }
@@ -35,10 +35,10 @@ fun SpotList(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         items(spots, key = Spot::id) { spot ->
-            SpotCard(
+            TarjetaSitio(
                 spot = spot,
-                onToggleSaved = { onToggleSaved(spot.id) },
-                onClick = { onOpenSpot(spot) },
+                alMarcarGuardado = { alMarcarGuardado(spot.id) },
+                onClick = { alAbrirSitio(spot) },
             )
         }
     }

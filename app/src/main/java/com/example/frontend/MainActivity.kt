@@ -18,21 +18,21 @@ import androidx.compose.ui.Modifier
 import com.example.frontend.data.sampleSpots
 import com.example.frontend.model.Spot
 import com.example.frontend.ui.components.BottomTab
-import com.example.frontend.ui.components.CampusBottomNavBar
-import com.example.frontend.ui.screens.ComingSoonScreen
-import com.example.frontend.ui.screens.FavoritesScreen
-import com.example.frontend.ui.screens.FeedScreen
-import com.example.frontend.ui.screens.ProfileScreen
-import com.example.frontend.ui.screens.SpotDetailScreen
-import com.example.frontend.ui.theme.FrontEndTheme
+import com.example.frontend.ui.components.BarraInferior
+import com.example.frontend.ui.screens.PantallaProximamente
+import com.example.frontend.ui.screens.PantallaGuardados
+import com.example.frontend.ui.screens.PantallaParaTi
+import com.example.frontend.ui.screens.PantallaPerfil
+import com.example.frontend.ui.screens.PantallaDetalle
+import com.example.frontend.ui.theme.TemaCampusBites
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FrontEndTheme {
-                CampusBitesApp()
+            TemaCampusBites {
+                PantallaPrincipal()
             }
         }
     }
@@ -40,23 +40,23 @@ class MainActivity : ComponentActivity() {
 
 // Dueño del estado compartido (lista de spots + tab activo + spot abierto).
 @Composable
-fun CampusBitesApp() {
+fun PantallaPrincipal() {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }
     var spots by remember { mutableStateOf(sampleSpots) }
     var selectedSpot by remember { mutableStateOf<Spot?>(null) }
 
-    fun toggleSaved(id: String) {
+    fun marcarGuardado(id: String) {
         spots = spots.map { spot -> if (spot.id == id) spot.copy(isSaved = !spot.isSaved) else spot }
     }
 
-    val openSpot: (Spot) -> Unit = { spot -> selectedSpot = spot }
+    val abrirSitio: (Spot) -> Unit = { spot -> selectedSpot = spot }
 
     val detailSpot = selectedSpot
     if (detailSpot != null) {
-        SpotDetailScreen(
+        PantallaDetalle(
             spot = detailSpot,
-            onToggleSaved = ::toggleSaved,
-            onBack = { selectedSpot = null },
+            alMarcarGuardado = ::marcarGuardado,
+            alVolver = { selectedSpot = null },
             modifier = Modifier.fillMaxSize(),
         )
         return
@@ -64,31 +64,31 @@ fun CampusBitesApp() {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = { CampusBottomNavBar(current = currentTab, onSelect = { currentTab = it }) },
+        bottomBar = { BarraInferior(current = currentTab, alElegir = { currentTab = it }) },
     ) { innerPadding ->
         val contentModifier = Modifier
             .fillMaxSize()
             .padding(top = innerPadding.calculateTopPadding())
 
         when (currentTab) {
-            BottomTab.FOR_YOU -> FeedScreen(
+            BottomTab.FOR_YOU -> PantallaParaTi(
                 spots = spots,
-                onToggleSaved = ::toggleSaved,
-                onOpenSpot = openSpot,
+                alMarcarGuardado = ::marcarGuardado,
+                alAbrirSitio = abrirSitio,
                 modifier = contentModifier,
             )
-            BottomTab.MAP -> ComingSoonScreen(
+            BottomTab.MAP -> PantallaProximamente(
                 title = "Map",
                 icon = Icons.Filled.Map,
                 modifier = contentModifier,
             )
-            BottomTab.SAVED -> FavoritesScreen(
+            BottomTab.SAVED -> PantallaGuardados(
                 spots = spots,
-                onToggleSaved = ::toggleSaved,
-                onOpenSpot = openSpot,
+                alMarcarGuardado = ::marcarGuardado,
+                alAbrirSitio = abrirSitio,
                 modifier = contentModifier,
             )
-            BottomTab.PROFILE -> ProfileScreen(
+            BottomTab.PROFILE -> PantallaPerfil(
                 savedCount = spots.count { it.isSaved },
                 modifier = contentModifier,
             )

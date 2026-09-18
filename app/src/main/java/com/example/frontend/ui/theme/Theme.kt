@@ -16,7 +16,7 @@ private val CampusBitesColorScheme = lightColorScheme(
 )
 
 @Composable
-fun FrontEndTheme(
+fun TemaCampusBites(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
