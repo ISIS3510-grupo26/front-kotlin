@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +19,6 @@ import com.example.frontend.model.PeerReview
 import com.example.frontend.model.Spot
 import com.example.frontend.ui.components.BottomTab
 import com.example.frontend.ui.components.BarraInferior
-import com.example.frontend.ui.screens.PantallaProximamente
 import com.example.frontend.ui.screens.PantallaGuardados
 import com.example.frontend.ui.screens.PantallaParaTi
 import com.example.frontend.ui.screens.PantallaPerfil
@@ -29,6 +27,9 @@ import com.example.frontend.ui.theme.TemaCampusBites
 import com.example.frontend.model.TasteProfile
 import com.example.frontend.ui.screens.PantallaEscribirResena
 import com.example.frontend.ui.screens.PantallaPerfilGusto
+import com.example.frontend.ui.screens.PantallaMapa
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,9 +125,10 @@ fun PantallaPrincipal() {
                 alAbrirSitio = abrirSitio,
                 modifier = contentModifier,
             )
-            BottomTab.MAP -> PantallaProximamente(
-                title = "Map",
-                icon = Icons.Filled.Map,
+            BottomTab.MAP -> PantallaMapa(
+                alAbrirLugar = { mapSpot ->
+                    spots.firstOrNull { it.name == mapSpot.name }?.let(abrirSitio)
+                },
                 modifier = contentModifier,
             )
             BottomTab.SAVED -> PantallaGuardados(
