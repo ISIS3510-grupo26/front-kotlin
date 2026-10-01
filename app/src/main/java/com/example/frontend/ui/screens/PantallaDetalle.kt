@@ -34,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -62,6 +63,9 @@ fun PantallaDetalle(
     alVolver: () -> Unit,
     alEscribirResena: () -> Unit,
     modifier: Modifier = Modifier,
+    cargando: Boolean = false,
+    error: String? = null,
+    alReintentar: () -> Unit = {},
 ) {
     var isSaved by remember { mutableStateOf(spot.isSaved) }
 
@@ -92,6 +96,14 @@ fun PantallaDetalle(
                     TarjetaBeneficio(text = spot.uniCardPerk)
                     Spacer(Modifier.size(22.dp))
                 }
+            }
+            // Mientras llega (o si falla) la info completa del backend, se muestra
+            // el encabezado con lo que ya trae la lista y un estado en lugar del menu/reseñas.
+            if (cargando || error != null) {
+                item {
+                    if (cargando) CargandoDetalle() else ErrorDetalle(mensaje = error.orEmpty(), alReintentar = alReintentar)
+                }
+                return@LazyColumn
             }
             item {
                 TituloSeccion(
@@ -142,6 +154,33 @@ fun PantallaDetalle(
                 }
                 Spacer(Modifier.size(24.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun CargandoDetalle() {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = AppColors.tomato)
+    }
+}
+
+@Composable
+private fun ErrorDetalle(mensaje: String, alReintentar: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(mensaje, fontSize = 13.sp, color = AppColors.muted)
+        Spacer(Modifier.size(12.dp))
+        Button(
+            onClick = alReintentar,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.tomato, contentColor = Color.White),
+        ) {
+            Text("Retry", fontWeight = FontWeight.ExtraBold)
         }
     }
 }

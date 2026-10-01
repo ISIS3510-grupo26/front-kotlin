@@ -43,9 +43,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Dueño del estado compartido (lista de spots + tab activo + spot abierto).
+// La UI observa el estado del ViewModel (MVVM); los datos vienen del backend vía SpotsRepository.
 @Composable
-fun PantallaPrincipal() {
+fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }
     var spots by remember { mutableStateOf(sampleSpots) }
     var selectedSpot by remember { mutableStateOf<Spot?>(null) }
@@ -114,9 +114,18 @@ fun PantallaPrincipal() {
         modifier = Modifier.fillMaxSize(),
         bottomBar = { BarraInferior(current = currentTab, alElegir = { currentTab = it }) },
     ) { innerPadding ->
-        val contentModifier = Modifier
-            .fillMaxSize()
-            .padding(top = innerPadding.calculateTopPadding())
+        Column(modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
+            if (viewModel.modoRespaldo) {
+                AvisoSinConexion(alReintentar = viewModel::cargarSitios)
+            }
+            val contentModifier = Modifier.fillMaxSize()
+
+            if (viewModel.cargandoLista && spots.isEmpty()) {
+                Box(modifier = contentModifier, contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AppColors.tomato)
+                }
+                return@Column
+            }
 
         when (currentTab) {
             BottomTab.FOR_YOU -> PantallaParaTi(
@@ -144,5 +153,24 @@ fun PantallaPrincipal() {
                 modifier = contentModifier,
             )
         }
+    }
+}
+
+@Composable
+private fun AvisoSinConexion(alReintentar: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.tomatoLight)
+            .clickable(onClick = alReintentar)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Offline: showing saved catalog. Tap to retry.",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = AppColors.tomato,
+        )
     }
 }
