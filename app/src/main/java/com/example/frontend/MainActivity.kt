@@ -15,8 +15,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.example.frontend.data.sampleSpots
-import com.example.frontend.model.Spot
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.frontend.ui.CampusBitesViewModel
+import com.example.frontend.ui.theme.AppColors
 import com.example.frontend.ui.components.BottomTab
 import com.example.frontend.ui.components.BarraInferior
 import com.example.frontend.ui.screens.PantallaProximamente
@@ -38,25 +52,22 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Dueño del estado compartido (lista de spots + tab activo + spot abierto).
+// La UI observa el estado del ViewModel (MVVM); los datos vienen del backend vía SpotsRepository.
 @Composable
-fun PantallaPrincipal() {
+fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }
-    var spots by remember { mutableStateOf(sampleSpots) }
-    var selectedSpot by remember { mutableStateOf<Spot?>(null) }
+    val spots = viewModel.spots
 
-    fun marcarGuardado(id: String) {
-        spots = spots.map { spot -> if (spot.id == id) spot.copy(isSaved = !spot.isSaved) else spot }
-    }
-
-    val abrirSitio: (Spot) -> Unit = { spot -> selectedSpot = spot }
-
-    val detailSpot = selectedSpot
-    if (detailSpot != null) {
+    val detalle = viewModel.detalle
+    if (detalle != null) {
+        BackHandler(onBack = viewModel::cerrarDetalle)
         PantallaDetalle(
-            spot = detailSpot,
-            alMarcarGuardado = ::marcarGuardado,
-            alVolver = { selectedSpot = null },
+            spot = detalle.spot.copy(isSaved = viewModel.estaGuardado(detalle.spot.id)),
+            cargando = detalle.cargando,
+            error = detalle.error,
+            alReintentar = viewModel::reintentarDetalle,
+            alMarcarGuardado = viewModel::marcarGuardado,
+            alVolver = viewModel::cerrarDetalle,
             modifier = Modifier.fillMaxSize(),
         )
         return
@@ -66,32 +77,61 @@ fun PantallaPrincipal() {
         modifier = Modifier.fillMaxSize(),
         bottomBar = { BarraInferior(current = currentTab, alElegir = { currentTab = it }) },
     ) { innerPadding ->
-        val contentModifier = Modifier
-            .fillMaxSize()
-            .padding(top = innerPadding.calculateTopPadding())
+        Column(modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
+            if (viewModel.modoRespaldo) {
+                AvisoSinConexion(alReintentar = viewModel::cargarSitios)
+            }
+            val contentModifier = Modifier.fillMaxSize()
 
-        when (currentTab) {
-            BottomTab.FOR_YOU -> PantallaParaTi(
-                spots = spots,
-                alMarcarGuardado = ::marcarGuardado,
-                alAbrirSitio = abrirSitio,
-                modifier = contentModifier,
-            )
-            BottomTab.MAP -> PantallaProximamente(
-                title = "Map",
-                icon = Icons.Filled.Map,
-                modifier = contentModifier,
-            )
-            BottomTab.SAVED -> PantallaGuardados(
-                spots = spots,
-                alMarcarGuardado = ::marcarGuardado,
-                alAbrirSitio = abrirSitio,
-                modifier = contentModifier,
-            )
-            BottomTab.PROFILE -> PantallaPerfil(
-                savedCount = spots.count { it.isSaved },
-                modifier = contentModifier,
-            )
+            if (viewModel.cargandoLista && spots.isEmpty()) {
+                Box(modifier = contentModifier, contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AppColors.tomato)
+                }
+                return@Column
+            }
+
+            when (currentTab) {
+                BottomTab.FOR_YOU -> PantallaParaTi(
+                    spots = spots,
+                    alMarcarGuardado = viewModel::marcarGuardado,
+                    alAbrirSitio = viewModel::abrirSitio,
+                    modifier = contentModifier,
+                )
+                BottomTab.MAP -> PantallaProximamente(
+                    title = "Map",
+                    icon = Icons.Filled.Map,
+                    modifier = contentModifier,
+                )
+                BottomTab.SAVED -> PantallaGuardados(
+                    spots = spots,
+                    alMarcarGuardado = viewModel::marcarGuardado,
+                    alAbrirSitio = viewModel::abrirSitio,
+                    modifier = contentModifier,
+                )
+                BottomTab.PROFILE -> PantallaPerfil(
+                    savedCount = spots.count { it.isSaved },
+                    modifier = contentModifier,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun AvisoSinConexion(alReintentar: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.tomatoLight)
+            .clickable(onClick = alReintentar)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Offline: showing saved catalog. Tap to retry.",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = AppColors.tomato,
+        )
     }
 }
