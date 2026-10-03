@@ -18,6 +18,8 @@ import com.example.frontend.model.Spot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import com.example.frontend.data.BusquedasPorDiaRepository
+import com.example.frontend.model.BusquedasPorDiaSemana
 
 data class EstadoDetalle(
     val spot: Spot,
@@ -37,6 +39,7 @@ class CampusBitesViewModel(
     private val repository: SpotsRepository = SpotsRepository(ApiClient.api),
     private val telemetria: TelemetriaCargas = TelemetriaCargas(ApiClient.api),
     private val popularidadRepository: PopularidadRepository = PopularidadRepository(ApiClient.api),
+    private val busquedasPorDiaRepository: BusquedasPorDiaRepository = BusquedasPorDiaRepository(ApiClient.api)
 ) : ViewModel() {
 
     // Los guardados viven en el dispositivo; arrancan con los del diseño original.
@@ -88,6 +91,8 @@ class CampusBitesViewModel(
 
     // Para la pantalla "Popular by hour": todas las horas con actividad.
     suspend fun popularidadPorHoras(): PopularidadPorHora = popularidadRepository.rankingPorHoras()
+
+    suspend fun busquedasPorDiaSemana(): BusquedasPorDiaSemana = busquedasPorDiaRepository.cargar()
 
     fun estaGuardado(id: String) = id in savedIds
 

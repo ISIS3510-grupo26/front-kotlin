@@ -92,3 +92,17 @@ data class SpotViewsByHourDto(
     val tzOffsetMinutes: Int,
     val hours: List<HourlyRankingDto>,
 )
+
+data class WeekdaySearchCountDto(
+    val dayOfWeek: Int, // 0 = Monday ... 6 = Sunday
+    val dayName: String,
+    val searches: Int,
+)
+
+data class SearchesByWeekdayDto(
+    val question: String,
+    val days: Int,
+    val tzOffsetMinutes: Int,
+    val totalSearches: Int,
+    val byDay: List<WeekdaySearchCountDto>,
+)

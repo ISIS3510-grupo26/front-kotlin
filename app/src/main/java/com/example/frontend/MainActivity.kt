@@ -116,6 +116,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
             horaActual = ContextoHorario.Dispositivo.horaLocal(),
             cargar = viewModel::popularidadPorHoras,
             alAbrirSitio = abrirPorId,
+            cargarBusquedasPorDia = viewModel::busquedasPorDiaSemana,
             alVolver = { viendoPopularidad = false },
             modifier = Modifier.fillMaxSize(),
         )

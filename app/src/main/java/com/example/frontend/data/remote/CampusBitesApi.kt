@@ -32,6 +32,12 @@ interface CampusBitesApi {
         @Query("days") days: Int = 7,
         @Query("limit") limit: Int = 5,
     ): SpotViewsByHourDto
+
+    @GET("api/v1/analytics/searches-by-weekday")
+    suspend fun busquedasPorDia(
+        @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
+        @Query("days") days: Int = 28,
+    ): SearchesByWeekdayDto
 }
 
 object ApiClient {
