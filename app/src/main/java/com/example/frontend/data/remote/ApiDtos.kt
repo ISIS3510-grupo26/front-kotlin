@@ -66,3 +66,29 @@ data class PageLoadEventDto(
 data class PageLoadBatchDto(val events: List<PageLoadEventDto>)
 
 data class IngestResultDto(val accepted: Int, val duplicates: Int)
+
+// ---------- BQ3: vistas de pagina + busquedas por hora (GET /analytics/spot-views-by-hour) ----------
+
+data class SpotHourlyActivityDto(
+    val rank: Int,
+    val spotId: String,
+    val name: String,
+    val emoji: String,
+    val pageViews: Int,
+    val searches: Int,
+    val total: Int,
+)
+
+data class HourlyRankingDto(
+    val hour: Int,
+    val totalPageViews: Int,
+    val totalSearches: Int,
+    val spots: List<SpotHourlyActivityDto>,
+)
+
+data class SpotViewsByHourDto(
+    val question: String,
+    val days: Int,
+    val tzOffsetMinutes: Int,
+    val hours: List<HourlyRankingDto>,
+)

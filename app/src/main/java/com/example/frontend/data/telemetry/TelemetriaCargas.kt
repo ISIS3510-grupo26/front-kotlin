@@ -31,23 +31,52 @@ class TelemetriaCargas(private val api: CampusBitesApi) {
     private val pendientes = ArrayDeque<PageLoadEventDto>()
     private val sessionId = UUID.randomUUID().toString()
 
+    // Vista de pagina de restaurante (BQ1, BQ2 y BQ3): cuanto tardo y si fallo.
     fun registrar(spotId: String, durationMs: Long, error: Throwable?) {
-        val evento = PageLoadEventDto(
-            eventId = UUID.randomUUID().toString(),
-            screen = SCREEN_RESTAURANT_DETAIL,
-            spotId = spotId,
-            durationMs = durationMs,
-            success = error == null,
-            httpStatus = if (error == null) 200 else (error as? HttpException)?.code(),
-            errorType = error?.let(::clasificarError),
-            deviceModel = modeloDispositivo(),
-            osName = "Android",
-            osVersion = Build.VERSION.RELEASE,
-            platform = "android-kotlin",
-            appVersion = BuildConfig.VERSION_NAME,
-            sessionId = sessionId,
-            occurredAt = ahoraIso8601(),
+        encolar(
+            PageLoadEventDto(
+                eventId = UUID.randomUUID().toString(),
+                screen = SCREEN_RESTAURANT_DETAIL,
+                spotId = spotId,
+                durationMs = durationMs,
+                success = error == null,
+                httpStatus = if (error == null) 200 else (error as? HttpException)?.code(),
+                errorType = error?.let(::clasificarError),
+                deviceModel = modeloDispositivo(),
+                osName = "Android",
+                osVersion = Build.VERSION.RELEASE,
+                platform = "android-kotlin",
+                appVersion = BuildConfig.VERSION_NAME,
+                sessionId = sessionId,
+                occurredAt = ahoraIso8601(),
+            )
         )
+    }
+
+    // Busqueda (BQ3): el usuario escribio en el buscador y eligio este restaurante.
+    // Usa el mismo contrato y la misma cola; el backend lo distingue por screen = "search".
+    fun registrarBusqueda(spotId: String) {
+        encolar(
+            PageLoadEventDto(
+                eventId = UUID.randomUUID().toString(),
+                screen = SCREEN_SEARCH,
+                spotId = spotId,
+                durationMs = 0,
+                success = true,
+                httpStatus = null,
+                errorType = null,
+                deviceModel = modeloDispositivo(),
+                osName = "Android",
+                osVersion = Build.VERSION.RELEASE,
+                platform = "android-kotlin",
+                appVersion = BuildConfig.VERSION_NAME,
+                sessionId = sessionId,
+                occurredAt = ahoraIso8601(),
+            )
+        )
+    }
+
+    private fun encolar(evento: PageLoadEventDto) {
         scope.launch {
             lock.withLock {
                 pendientes.addLast(evento)
@@ -71,6 +100,7 @@ class TelemetriaCargas(private val api: CampusBitesApi) {
 
     private companion object {
         const val SCREEN_RESTAURANT_DETAIL = "restaurant_detail"
+        const val SCREEN_SEARCH = "search"
         const val MAX_PENDIENTES = 500
 
         fun clasificarError(e: Throwable): String = when (e) {

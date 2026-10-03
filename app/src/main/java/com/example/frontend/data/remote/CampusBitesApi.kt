@@ -10,6 +10,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface CampusBitesApi {
     @GET("api/v1/spots")
@@ -20,6 +21,17 @@ interface CampusBitesApi {
 
     @POST("api/v1/telemetry/page-loads")
     suspend fun enviarCargas(@Body batch: PageLoadBatchDto): IngestResultDto
+
+    // BQ3 (tipo 4): "vistas de pagina + busquedas por restaurante en cada hora". La respuesta de la
+    // business question llega directo a la UI como feature. `hour` = hora local del celular (contexto);
+    // sin `hour` el backend devuelve todas las horas con actividad.
+    @GET("api/v1/analytics/spot-views-by-hour")
+    suspend fun vistasPorHora(
+        @Query("hour") hour: Int?,
+        @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
+        @Query("days") days: Int = 7,
+        @Query("limit") limit: Int = 5,
+    ): SpotViewsByHourDto
 }
 
 object ApiClient {
