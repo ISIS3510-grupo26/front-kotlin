@@ -26,3 +26,15 @@ data class PopularidadPorHora(
     val days: Int,
     val horas: List<RankingHora>,
 )
+
+data class ConteoBusquedaDia(
+    val dayOfWeek: Int,
+    val dayName: String,
+    val searches: Int,
+)
+
+data class BusquedasPorDiaSemana(
+    val days: Int,
+    val totalSearches: Int,
+    val dias: List<ConteoBusquedaDia>,
+)

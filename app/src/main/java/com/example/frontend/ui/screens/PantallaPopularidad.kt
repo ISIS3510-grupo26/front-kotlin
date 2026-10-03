@@ -50,6 +50,8 @@ import com.example.frontend.ui.components.ChipPildora
 import com.example.frontend.ui.components.InsigniaRanking
 import com.example.frontend.ui.theme.AppColors
 import kotlinx.coroutines.CancellationException
+import com.example.frontend.model.BusquedasPorDiaSemana
+import com.example.frontend.ui.components.SeccionBusquedasPorDia
 
 private sealed interface EstadoPantalla {
     data object Cargando : EstadoPantalla
@@ -63,6 +65,7 @@ private sealed interface EstadoPantalla {
 fun PantallaPopularidad(
     horaActual: Int,
     cargar: suspend () -> PopularidadPorHora,
+    cargarBusquedasPorDia: suspend () -> BusquedasPorDiaSemana,
     alAbrirSitio: (spotId: String) -> Unit,
     alVolver: () -> Unit,
     modifier: Modifier = Modifier,
@@ -136,7 +139,7 @@ fun PantallaPopularidad(
                 is EstadoPantalla.Listo -> {
                     val ranking = actual.datos.horas.firstOrNull { it.hour == horaElegida }
                         ?: RankingHora(horaElegida, 0, 0, emptyList())
-                    ListaRanking(ranking = ranking, dias = actual.datos.days, alAbrirSitio = alAbrirSitio)
+                    ListaRanking(ranking = ranking, dias = actual.datos.days, alAbrirSitio = alAbrirSitio, cargarBusquedasPorDia = cargarBusquedasPorDia)
                 }
             }
         }
@@ -144,7 +147,7 @@ fun PantallaPopularidad(
 }
 
 @Composable
-private fun ListaRanking(ranking: RankingHora, dias: Int, alAbrirSitio: (String) -> Unit) {
+private fun ListaRanking(ranking: RankingHora, dias: Int, alAbrirSitio: (String) -> Unit, cargarBusquedasPorDia: suspend () -> BusquedasPorDiaSemana) {
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -169,6 +172,11 @@ private fun ListaRanking(ranking: RankingHora, dias: Int, alAbrirSitio: (String)
                 }
             }
         }
+
+        item(key = "busquedas-por-dia") {
+            SeccionBusquedasPorDia(cargar = cargarBusquedasPorDia)
+       }
+
         if (ranking.sitios.isEmpty()) {
             item(key = "vacio") {
                 Text(
