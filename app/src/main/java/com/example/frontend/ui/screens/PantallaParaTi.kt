@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.FeedFilterType
 import com.example.frontend.model.Spot
+import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.EstadoPopularidad
 import com.example.frontend.ui.components.ChipPildora
 import com.example.frontend.ui.components.ListaSitios
@@ -72,6 +73,8 @@ fun PantallaParaTi(
     alAbrirSitioPorId: (String) -> Unit,
     alVerPopularidad: () -> Unit,
     modifier: Modifier = Modifier,
+    tiemposEspera: Map<String, TiempoEspera> = emptyMap(),
+    seccionCercanos: @Composable () -> Unit = {},
 ) {
     val filters = remember { FiltrosFeed(listOf(FeedFilterType.IN_A_RUSH)) }
     var consulta by rememberSaveable { mutableStateOf("") }
@@ -86,6 +89,7 @@ fun PantallaParaTi(
                 alMarcarGuardado = alMarcarGuardado,
                 // Abrir desde resultados de busqueda cuenta como "busqueda" para la BQ3.
                 alAbrirSitio = alAbrirDesdeBusqueda,
+                tiemposEspera = tiemposEspera,
             )
         } else {
             ListaSitios(
@@ -95,12 +99,16 @@ fun PantallaParaTi(
                 alAbrirSitio = alAbrirSitio,
                 // "Popular right now" (BQ3) se desplaza con el feed y solo aparece cuando hay datos.
                 encabezado = {
-                    SeccionPopularidad(
-                        estado = popularidad,
-                        alAbrirSitio = alAbrirSitioPorId,
-                        alVerTodo = alVerPopularidad,
-                    )
+                    Column {
+                        seccionCercanos()
+                        SeccionPopularidad(
+                            estado = popularidad,
+                            alAbrirSitio = alAbrirSitioPorId,
+                            alVerTodo = alVerPopularidad,
+                        )
+                    }
                 },
+                tiemposEspera = tiemposEspera,
             )
         }
     }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.Spot
 import com.example.frontend.model.SpotCategory
+import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.components.ChipPildora
 import com.example.frontend.ui.components.ListaSitios
 import com.example.frontend.ui.theme.AppColors
@@ -32,6 +33,7 @@ fun PantallaGuardados(
     alMarcarGuardado: (String) -> Unit,
     alAbrirSitio: (Spot) -> Unit,
     modifier: Modifier = Modifier,
+    tiemposEspera: Map<String, TiempoEspera> = emptyMap(),
 ) {
     var selected by rememberSaveable { mutableStateOf<SpotCategory?>(null) }
 
@@ -51,6 +53,7 @@ fun PantallaGuardados(
             mensajeVacio = "No saved places in this category yet.",
             alMarcarGuardado = alMarcarGuardado,
             alAbrirSitio = alAbrirSitio,
+            tiemposEspera = tiemposEspera,
         )
     }
 }

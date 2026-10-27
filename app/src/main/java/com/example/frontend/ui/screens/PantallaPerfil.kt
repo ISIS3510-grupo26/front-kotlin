@@ -67,7 +67,15 @@ private val badges = listOf(
 )
 
 @Composable
-fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier, perfil: TasteProfile, alEditarGusto: () -> Unit) {
+fun PantallaPerfil(
+    savedCount: Int,
+    modifier: Modifier = Modifier,
+    perfil: TasteProfile,
+    alEditarGusto: () -> Unit,
+    correoSesion: String? = null,
+    alIniciarSesion: () -> Unit = {},
+    alCerrarSesion: () -> Unit = {},
+) {
     val unlocked = badges.count { it.unlocked }
 
     LazyColumn(
@@ -97,6 +105,7 @@ fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier, perfil: Taste
                 Text("Universidad de los Andes", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.muted)
             }
         }
+        item { TarjetaCuenta(correoSesion, alIniciarSesion, alCerrarSesion) }
         item {
             Column(modifier = Modifier.padding(top = 24.dp)) {
                 TituloSeccion(title = "Taste Profile") {
@@ -161,6 +170,30 @@ fun PantallaPerfil(savedCount: Int, modifier: Modifier = Modifier, perfil: Taste
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TarjetaCuenta(correo: String?, alIniciarSesion: () -> Unit, alCerrarSesion: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .background(AppColors.surface, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(if (correo != null) "Signed in" else "Not signed in", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppColors.espresso)
+            Text(correo ?: "Sign in to get picks you haven't tried", fontSize = 12.sp, color = AppColors.muted)
+        }
+        Text(
+            if (correo != null) "Sign out" else "Sign in",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = AppColors.tomato,
+            modifier = Modifier.clickable(onClick = if (correo != null) alCerrarSesion else alIniciarSesion),
+        )
     }
 }
 

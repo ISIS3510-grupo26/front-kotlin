@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.frontend.model.Spot
+import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
@@ -25,6 +26,7 @@ fun ListaSitios(
     modifier: Modifier = Modifier,
     // Contenido opcional que se desplaza junto con la lista (p. ej. la seccion "Trending now").
     encabezado: (@Composable () -> Unit)? = null,
+    tiemposEspera: Map<String, TiempoEspera> = emptyMap(),
 ) {
     if (spots.isEmpty() && encabezado == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -51,6 +53,7 @@ fun ListaSitios(
         items(spots, key = Spot::id) { spot ->
             TarjetaSitio(
                 spot = spot,
+                tiempoEspera = tiemposEspera[spot.id],
                 alMarcarGuardado = { alMarcarGuardado(spot.id) },
                 onClick = { alAbrirSitio(spot) },
             )

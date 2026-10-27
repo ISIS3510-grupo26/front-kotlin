@@ -106,3 +106,70 @@ data class SearchesByWeekdayDto(
     val totalSearches: Int,
     val byDay: List<WeekdaySearchCountDto>,
 )
+
+// ---------- BQ4: tiempos de espera reportados ----------
+
+data class WaitTimeReportDto(
+    val reportId: String,
+    val minutes: Int,
+    val platform: String,
+    val reportedAt: String,
+)
+
+data class WaitTimeReportResultDto(
+    val spotId: String,
+    val minutes: Int,
+    val reportedAt: String,
+    val duplicate: Boolean,
+)
+
+data class LastWaitTimeDto(
+    val spotId: String,
+    val name: String,
+    val emoji: String,
+    val minutes: Int?,
+    val reportedAt: String?,
+    val minutesAgo: Int?,
+    val isRecent: Boolean,
+    val recentReports: Int,
+)
+
+data class LastWaitTimesDto(
+    val question: String,
+    val freshMinutes: Int,
+    val spots: List<LastWaitTimeDto>,
+)
+
+// ---------- Autenticacion (backend de Camilo: /api/v1/auth) ----------
+
+data class CredencialesDto(
+    val email: String,
+    val password: String,
+)
+
+data class AuthTokenDto(
+    val userId: String,
+    val email: String,
+    val accessToken: String,
+    val tokenType: String,
+    val expiresIn: Long,
+    val expiresAt: String,
+)
+
+data class UsuarioDto(
+    val userId: String,
+    val email: String,
+)
+
+// ---------- BQ3 (backend de Esteban): cercanos mejor calificados que el usuario no ha probado ----------
+
+data class NearbyPickDto(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val rating: Double,
+    val latitude: Double,
+    val longitude: Double,
+    val distanceMeters: Int,
+    val walkMinutes: Double,
+)

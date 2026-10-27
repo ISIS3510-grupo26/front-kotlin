@@ -33,6 +33,33 @@ interface CampusBitesApi {
         @Query("limit") limit: Int = 5,
     ): SpotViewsByHourDto
 
+    // BQ4 (tipo 2): ultimo tiempo de espera reportado de cada restaurante.
+    @GET("api/v1/spots/wait-times/latest")
+    suspend fun ultimosTiemposEspera(): LastWaitTimesDto
+
+    @POST("api/v1/spots/{id}/wait-times")
+    suspend fun reportarEspera(@Path("id") id: String, @Body reporte: WaitTimeReportDto): WaitTimeReportResultDto
+
+    // Autenticacion basica con JWT. El token lo agrega InterceptorSesion a cada peticion.
+    @POST("api/v1/auth/login")
+    suspend fun iniciarSesion(@Body credenciales: CredencialesDto): AuthTokenDto
+
+    @POST("api/v1/auth/signup")
+    suspend fun registrarse(@Body credenciales: CredencialesDto): AuthTokenDto
+
+    @GET("api/v1/auth/me")
+    suspend fun yo(): UsuarioDto
+
+    // BQ3 (tipo 2): los mejor calificados cerca de (lat, lng) que el usuario todavia no ha probado.
+    @GET("api/v1/users/{userId}/recommendations/nearby")
+    suspend fun recomendacionesCercanas(
+        @Path("userId") userId: String,
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("maxWalkMinutes") maxWalkMinutes: Int = 15,
+        @Query("limit") limit: Int = 5,
+    ): List<NearbyPickDto>
+
     @GET("api/v1/analytics/searches-by-weekday")
     suspend fun busquedasPorDia(
         @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
@@ -45,6 +72,7 @@ object ApiClient {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .addInterceptor(InterceptorSesion)
         .apply {
             if (BuildConfig.DEBUG) {
                 addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.Spot
+import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
@@ -41,6 +42,7 @@ fun TarjetaSitio(
     alMarcarGuardado: () -> Unit,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    tiempoEspera: TiempoEspera? = null,
 ) {
     Card(
         onClick = { onClick?.invoke() },
@@ -107,6 +109,7 @@ fun TarjetaSitio(
                         Puntito()
                         Text(spot.distance, fontSize = 12.sp, color = AppColors.muted)
                     }
+                    EtiquetaEspera(tiempo = tiempoEspera, modifier = Modifier.padding(top = 6.dp))
                 }
             }
             Spacer(Modifier.size(12.dp))

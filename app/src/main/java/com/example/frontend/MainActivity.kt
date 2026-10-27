@@ -1,8 +1,11 @@
 package com.example.frontend
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -31,7 +34,9 @@ import com.example.frontend.model.TasteProfile
 import com.example.frontend.ui.CampusBitesViewModel
 import com.example.frontend.ui.components.BarraInferior
 import com.example.frontend.ui.components.BottomTab
+import com.example.frontend.ui.components.SeccionCercanos
 import com.example.frontend.ui.screens.PantallaDetalle
+import com.example.frontend.ui.screens.PantallaLogin
 import com.example.frontend.ui.screens.PantallaEscribirResena
 import com.example.frontend.ui.screens.PantallaGuardados
 import com.example.frontend.ui.screens.PantallaMapa
@@ -63,6 +68,15 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     var editandoGusto by remember { mutableStateOf(false) }
     var escribiendoResena by remember { mutableStateOf(false) }
     var viendoPopularidad by remember { mutableStateOf(false) }
+    var mostrandoLogin by remember { mutableStateOf(false) }
+
+    // Permiso de ubicacion para BQ3. Si lo niega, la app sigue con la ubicacion del campus (Strategy).
+    val pedirUbicacion = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.alCambiarPermisoUbicacion()
+    }
+    val solicitarPermisoUbicacion = {
+        pedirUbicacion.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
 
     val spots = viewModel.spots
     val detalle = viewModel.detalle
@@ -70,6 +84,23 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     // Abrir por id sirve tanto para las tarjetas del feed como para el ranking "Popular right now".
     val abrirPorId: (String) -> Unit = { id -> viewModel.buscarSitio(id)?.let(viewModel::abrirSitio) }
 
+    if (mostrandoLogin) {
+        BackHandler { mostrandoLogin = false }
+        PantallaLogin(
+            estado = viewModel.login,
+            hayConexion = viewModel.hayConexion,
+            alEntrar = { email, password, registrando ->
+                viewModel.entrar(email, password, registrando) {
+                    mostrandoLogin = false
+                    solicitarPermisoUbicacion()
+                }
+            },
+            alEditar = viewModel::limpiarErrorLogin,
+            alVolver = { mostrandoLogin = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
     if (editandoGusto) {
         BackHandler { editandoGusto = false }
         PantallaPerfilGusto(
@@ -107,6 +138,11 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
             cargando = detalle.cargando,
             error = detalle.error,
             alReintentar = viewModel::reintentarDetalle,
+            aviso = detalle.aviso,
+            actualizando = detalle.actualizando,
+            tiempoEspera = viewModel.tiemposEspera[detalle.spot.id],
+            hayConexion = viewModel.hayConexion,
+            alReportarEspera = { minutos -> viewModel.reportarEspera(detalle.spot.id, minutos) },
         )
         return
     }
@@ -128,9 +164,13 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
         bottomBar = { BarraInferior(current = currentTab, alElegir = { currentTab = it }) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (viewModel.modoRespaldo) {
-                AvisoSinConexion(alReintentar = viewModel::cargarSitios)
+            // Conectividad eventual por vista: cada pestana dice que esta mostrando sin red, no un mensaje general.
+            val aviso = when (currentTab) {
+                BottomTab.FOR_YOU -> viewModel.avisoConexion
+                BottomTab.SAVED -> if (viewModel.modoRespaldo || !viewModel.hayConexion) "Offline: your saved places are shown from this phone." else null
+                else -> null
             }
+            aviso?.let { texto -> AvisoSinConexion(texto = texto, alReintentar = viewModel::cargarSitios) }
             val contentModifier = Modifier.fillMaxSize()
 
             if (viewModel.cargandoLista && spots.isEmpty()) {
@@ -150,6 +190,18 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                     alAbrirSitioPorId = abrirPorId,
                     alVerPopularidad = { viendoPopularidad = true },
                     modifier = contentModifier,
+                    tiemposEspera = viewModel.tiemposEspera,
+                    seccionCercanos = {
+                        SeccionCercanos(
+                            conSesion = viewModel.sesion != null,
+                            estado = viewModel.recomendaciones,
+                            tiemposEspera = viewModel.tiemposEspera,
+                            alIniciarSesion = { mostrandoLogin = true },
+                            alPedirUbicacion = solicitarPermisoUbicacion,
+                            alAbrirSitio = abrirPorId,
+                            alReintentar = { viewModel.cargarRecomendaciones(forzar = true) },
+                        )
+                    },
                 )
                 BottomTab.MAP -> PantallaMapa(
                     alAbrirLugar = { mapSpot ->
@@ -162,12 +214,16 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                     alMarcarGuardado = viewModel::marcarGuardado,
                     alAbrirSitio = viewModel::abrirSitio,
                     modifier = contentModifier,
+                    tiemposEspera = viewModel.tiemposEspera,
                 )
                 BottomTab.PROFILE -> PantallaPerfil(
                     savedCount = spots.count { it.isSaved },
                     perfil = perfilGusto,
                     alEditarGusto = { editandoGusto = true },
                     modifier = contentModifier,
+                    correoSesion = viewModel.sesion?.email,
+                    alIniciarSesion = { mostrandoLogin = true },
+                    alCerrarSesion = viewModel::cerrarSesion,
                 )
             }
         }
@@ -175,7 +231,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
 }
 
 @Composable
-private fun AvisoSinConexion(alReintentar: () -> Unit) {
+private fun AvisoSinConexion(texto: String, alReintentar: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,7 +241,7 @@ private fun AvisoSinConexion(alReintentar: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Offline: showing saved catalog. Tap to retry.",
+            texto,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = AppColors.tomato,

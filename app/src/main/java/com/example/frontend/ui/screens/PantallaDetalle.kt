@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Share
@@ -35,6 +36,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -54,6 +56,8 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.model.MenuItem
 import com.example.frontend.model.PeerReview
 import com.example.frontend.model.Spot
+import com.example.frontend.model.TiempoEspera
+import com.example.frontend.ui.components.TarjetaEspera
 import com.example.frontend.ui.theme.AppColors
 
 @Composable
@@ -66,20 +70,22 @@ fun PantallaDetalle(
     cargando: Boolean = false,
     error: String? = null,
     alReintentar: () -> Unit = {},
+    aviso: String? = null,
+    actualizando: Boolean = false,
+    tiempoEspera: TiempoEspera? = null,
+    hayConexion: Boolean = true,
+    alReportarEspera: (minutos: Int) -> Unit = {},
 ) {
-    var isSaved by remember { mutableStateOf(spot.isSaved) }
-
+    // El corazon sale del ViewModel (spot.isSaved), no de un estado local: antes se reiniciaba
+    // al ir a escribir una reseña y volver.
     Scaffold(
         modifier = modifier,
         containerColor = AppColors.cream,
         bottomBar = {
             BarraAcciones(
-                isSaved = isSaved,
+                isSaved = spot.isSaved,
                 walkLabel = spot.distance.replace(" walk", ""),
-                alMarcarGuardado = {
-                    isSaved = !isSaved
-                    alMarcarGuardado(spot.id)
-                },
+                alMarcarGuardado = { alMarcarGuardado(spot.id) },
             )
         },
     ) { innerPadding ->
@@ -90,12 +96,34 @@ fun PantallaDetalle(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         ) {
             item { Encabezado(spot = spot, alVolver = alVolver) }
+            if (actualizando) {
+                item {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        color = AppColors.tomato,
+                        trackColor = AppColors.tomatoLight,
+                    )
+                }
+            }
+            if (aviso != null) {
+                item { AvisoCopiaLocal(texto = aviso) }
+            }
             if (spot.uniCardPerk != null) {
                 item {
                     Spacer(Modifier.size(4.dp))
                     TarjetaBeneficio(text = spot.uniCardPerk)
                     Spacer(Modifier.size(22.dp))
                 }
+            }
+            // BQ4: va antes del menu para que se pueda reportar aunque el detalle no haya cargado.
+            item {
+                TarjetaEspera(
+                    spotId = spot.id,
+                    tiempo = tiempoEspera,
+                    hayConexion = hayConexion,
+                    alReportar = alReportarEspera,
+                )
+                Spacer(Modifier.size(22.dp))
             }
             // Mientras llega (o si falla) la info completa del backend, se muestra
             // el encabezado con lo que ya trae la lista y un estado en lugar del menu/reseñas.
@@ -155,6 +183,21 @@ fun PantallaDetalle(
                 Spacer(Modifier.size(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun AvisoCopiaLocal(texto: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 10.dp)
+            .background(AppColors.surface, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.CloudOff, contentDescription = null, tint = AppColors.muted, modifier = Modifier.size(14.dp))
+        Text("  $texto", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.espresso)
     }
 }
 
