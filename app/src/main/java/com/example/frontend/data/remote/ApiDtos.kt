@@ -41,6 +41,10 @@ data class SpotDto(
     val note: String,
     val uniCardPerk: String?,
     val totalReviews: Int,
+    // Coordenadas para el mapa. Las copias de Room guardadas antes de que el backend las mandara no las
+    // traen; Gson deja null y el mapa usa las del catalogo empaquetado.
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     // Solo vienen en GET /spots/{id}.
     val menu: List<MenuItemDto>? = null,
     val reviews: List<ReviewDto>? = null,
@@ -138,6 +142,50 @@ data class LastWaitTimesDto(
     val question: String,
     val freshMinutes: Int,
     val spots: List<LastWaitTimeDto>,
+)
+
+// ---------- Reseñas del usuario (POST /spots/{id}/reviews) ----------
+
+data class ReviewInDto(
+    val stars: Int,
+    val text: String,
+)
+
+data class ReviewCreatedDto(
+    val spotId: String,
+    val stars: Int,
+    val text: String,
+    val rating: Double,
+    val totalReviews: Int,
+)
+
+// ---------- BQ6: menor espera + compatibilidad con el perfil (GET /recommendations/best-for-you) ----------
+
+data class BestForYouSpotDto(
+    val rank: Int,
+    val spotId: String,
+    val name: String,
+    val emoji: String,
+    val cuisine: String,
+    val rating: Double,
+    val isBudget: Boolean,
+    val isVegetarian: Boolean,
+    val isHighProtein: Boolean,
+    val waitMinutes: Int?,
+    val minutesAgo: Int?,
+    val isRecent: Boolean,
+    val recentReports: Int,
+    val waitScore: Int,
+    val tasteMatch: Int?,
+    val score: Double,
+)
+
+data class BestForYouDto(
+    val question: String,
+    val freshMinutes: Int,
+    val maxWaitMinutes: Int,
+    val personalized: Boolean,
+    val spots: List<BestForYouSpotDto>,
 )
 
 // ---------- Autenticacion (backend de Camilo: /api/v1/auth) ----------

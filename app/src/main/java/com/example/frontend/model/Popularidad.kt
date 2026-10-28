@@ -25,6 +25,7 @@ data class RankingHora(
 data class PopularidadPorHora(
     val days: Int,
     val horas: List<RankingHora>,
+    val guardadoEn: Long? = null, // con valor: no hubo red y es el ultimo ranking guardado en el celular
 )
 
 data class ConteoBusquedaDia(

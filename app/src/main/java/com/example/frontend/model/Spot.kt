@@ -35,6 +35,8 @@ data class PeerReview(
 )
 
 // isSaved decide si el spot aparece en la pestaña Saved.
+// affinityPercent: el catalogo lo trae escrito a mano; el ViewModel lo reemplaza por la compatibilidad
+// real con el perfil de gusto (BQ6) antes de mostrarlo.
 data class Spot(
     val id: String,
     val emoji: String,
@@ -46,6 +48,8 @@ data class Spot(
     val price: String,
     val distance: String,
     val walkMinutes: Int,
+    val latitude: Double? = null,   // para ubicar el pin en el mapa
+    val longitude: Double? = null,
     val isBudget: Boolean,
     val isVegetarian: Boolean,
     val isHighProtein: Boolean,

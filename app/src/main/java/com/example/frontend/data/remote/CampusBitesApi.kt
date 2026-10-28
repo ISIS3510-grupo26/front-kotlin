@@ -1,6 +1,7 @@
 package com.example.frontend.data.remote
 
 import com.example.frontend.BuildConfig
+import com.example.frontend.model.TiempoEspera
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -39,6 +40,15 @@ interface CampusBitesApi {
 
     @POST("api/v1/spots/{id}/wait-times")
     suspend fun reportarEspera(@Path("id") id: String, @Body reporte: WaitTimeReportDto): WaitTimeReportResultDto
+
+    // Reseña del usuario de la sesion (exige token). La envia SincronizadorPendientes desde la cola de Room.
+    @POST("api/v1/spots/{id}/reviews")
+    suspend fun publicarResena(@Path("id") id: String, @Body resena: ReviewInDto): ReviewCreatedDto
+
+    // BQ6 (tipo 2): restaurantes con su ultima espera reportada. Se pide sin perfil de gusto: el perfil se
+    // queda en el celular y la compatibilidad se calcula aqui (MejorParaTiRepository + rankearMejorParaTi).
+    @GET("api/v1/recommendations/best-for-you")
+    suspend fun mejorParaTi(@Query("freshMinutes") freshMinutes: Int = TiempoEspera.MINUTOS_RECIENTE): BestForYouDto
 
     // Autenticacion basica con JWT. El token lo agrega InterceptorSesion a cada peticion.
     @POST("api/v1/auth/login")

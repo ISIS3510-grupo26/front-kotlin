@@ -28,8 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,27 +40,35 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.frontend.data.sampleMapSpots
+import com.example.frontend.data.pinesDelMapa
 import com.example.frontend.model.MapSpot
+import com.example.frontend.model.Spot
+import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.theme.AppColors
 import androidx.compose.material.icons.filled.MyLocation
 
+// Los pines salen del catalogo que ya tiene el ViewModel (red, Room o empaquetado), asi que el mapa
+// se dibuja igual sin conexion. El aviso offline lo pone MainActivity arriba de la pestaña.
 @Composable
 fun PantallaMapa(
-    alAbrirLugar: (MapSpot) -> Unit = {},
+    spots: List<Spot>,
+    tiemposEspera: Map<String, TiempoEspera>,
+    alAbrirSitio: (spotId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val spots = remember { sampleMapSpots }
-    var seleccionado by remember { mutableIntStateOf(0) }
+    val pines = remember(spots, tiemposEspera) { pinesDelMapa(spots, tiemposEspera) }
+    // Se recuerda el id y no la posicion: si cambia el orden (otro perfil de gusto), sigue el mismo restaurante.
+    var seleccionado by rememberSaveable { mutableStateOf<String?>(null) }
+    val actual = pines.firstOrNull { it.spotId == seleccionado } ?: pines.firstOrNull()
 
     Column(modifier = modifier.fillMaxSize()) {
         EncabezadoMapa()
         BarraBusquedaMapa()
         AreaMapa(
-            spots = spots,
-            seleccionado = seleccionado,
-            alSeleccionar = { seleccionado = it },
-            alAbrirLugar = alAbrirLugar,
+            spots = pines,
+            seleccionado = actual,
+            alSeleccionar = { seleccionado = it.spotId },
+            alAbrirLugar = { alAbrirSitio(it.spotId) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = 0.dp),
@@ -121,8 +130,8 @@ private fun BarraBusquedaMapa() {
 @Composable
 private fun AreaMapa(
     spots: List<MapSpot>,
-    seleccionado: Int,
-    alSeleccionar: (Int) -> Unit,
+    seleccionado: MapSpot?,
+    alSeleccionar: (MapSpot) -> Unit,
     alAbrirLugar: (MapSpot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -158,24 +167,41 @@ private fun AreaMapa(
             Icon(Icons.Filled.MyLocation, contentDescription = "Mi ubicación", tint = AppColors.espresso)
         }
 
-        spots.forEachIndexed { index, spot ->
-            Pin(
-                spot = spot,
-                selected = index == seleccionado,
-                modifier = Modifier.offset(x = w * spot.dx - 28.dp, y = h * spot.dy - 24.dp),
-                onTap = { alSeleccionar(index) },
-            )
+        // El seleccionado se dibuja de ultimo para que quede encima si dos pines se tocan.
+        spots.sortedBy { it.spotId == seleccionado?.spotId }.forEach { spot ->
+            // La caja mide ANCHO_PIN y el pin va centrado: la punta de abajo cae justo en la coordenada.
+            // Antes se restaba un valor fijo y la punta quedaba corrida segun el ancho del texto.
+            Box(
+                modifier = Modifier
+                    .offset(x = w * spot.dx - ANCHO_PIN / 2, y = h * spot.dy - ALTO_PIN)
+                    .width(ANCHO_PIN),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Pin(spot = spot, selected = spot.spotId == seleccionado?.spotId, onTap = { alSeleccionar(spot) })
+            }
         }
 
-        TarjetaLugarSeleccionado(
-            spot = spots[seleccionado],
-            alAbrirLugar = alAbrirLugar,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-        )
+        if (seleccionado == null) {
+            Text(
+                "No spots with a location to show yet.",
+                fontSize = 13.sp,
+                color = AppColors.muted,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        } else {
+            TarjetaLugarSeleccionado(
+                spot = seleccionado,
+                alAbrirLugar = alAbrirLugar,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+            )
+        }
     }
 }
+
+private val ANCHO_PIN = 80.dp
+private val ALTO_PIN = 42.dp
 
 @Composable
 private fun ZonaBloque(width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp, color: Color, left: androidx.compose.ui.unit.Dp, top: androidx.compose.ui.unit.Dp) {
@@ -289,7 +315,11 @@ private fun TarjetaLugarSeleccionado(
             )
             Spacer(Modifier.height(8.dp))
             Row {
-                PildoraMeta(label = "Quick Line", background = AppColors.tomatoLight, foreground = AppColors.tomato)
+                PildoraMeta(
+                    label = spot.minutosEspera?.let { "~$it min wait" } ?: "No recent wait report",
+                    background = AppColors.tomatoLight,
+                    foreground = AppColors.tomato,
+                )
                 Spacer(Modifier.width(8.dp))
                 PildoraMeta(label = spot.location, background = AppColors.surface, foreground = AppColors.espresso)
             }
