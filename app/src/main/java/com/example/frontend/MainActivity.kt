@@ -30,11 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.frontend.model.TasteProfile
 import com.example.frontend.ui.CampusBitesViewModel
 import com.example.frontend.ui.components.BarraInferior
 import com.example.frontend.ui.components.BottomTab
 import com.example.frontend.ui.components.SeccionCercanos
+import com.example.frontend.ui.components.SeccionMejorParaTi
 import com.example.frontend.ui.screens.PantallaDetalle
 import com.example.frontend.ui.screens.PantallaLogin
 import com.example.frontend.ui.screens.PantallaEscribirResena
@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }
-    var perfilGusto by remember { mutableStateOf(TasteProfile()) }
     var editandoGusto by remember { mutableStateOf(false) }
     var escribiendoResena by remember { mutableStateOf(false) }
     var viendoPopularidad by remember { mutableStateOf(false) }
@@ -104,26 +103,32 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     if (editandoGusto) {
         BackHandler { editandoGusto = false }
         PantallaPerfilGusto(
-            perfilInicial = perfilGusto,
+            perfilInicial = viewModel.perfilGusto,
             alGuardar = { nuevo ->
-                perfilGusto = nuevo
+                viewModel.guardarPerfilGusto(nuevo)
                 editandoGusto = false
             },
             alVolver = { editandoGusto = false },
             modifier = Modifier.fillMaxSize(),
+            hayConexion = viewModel.hayConexion,
         )
         return
     }
     if (detalle != null && escribiendoResena) {
         BackHandler { escribiendoResena = false }
+        val spotId = detalle.spot.id
         PantallaEscribirResena(
             placeName = "${detalle.spot.name} · ${detalle.spot.location}",
             alPublicar = { estrellas, texto ->
-                viewModel.agregarResena(detalle.spot.id, estrellas, texto)
+                viewModel.publicarResena(spotId, estrellas, texto)
                 escribiendoResena = false
             },
             alVolver = { escribiendoResena = false },
             modifier = Modifier.fillMaxSize(),
+            hayConexion = viewModel.hayConexion,
+            conSesion = viewModel.sesion != null,
+            cargarBorrador = { viewModel.leerBorrador(spotId) },
+            guardarBorrador = { estrellas, texto -> viewModel.guardarBorrador(spotId, estrellas, texto) },
         )
         return
     }
@@ -155,6 +160,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
             cargarBusquedasPorDia = viewModel::busquedasPorDiaSemana,
             alVolver = { viendoPopularidad = false },
             modifier = Modifier.fillMaxSize(),
+            hayConexion = viewModel.hayConexion,
         )
         return
     }
@@ -168,6 +174,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
             val aviso = when (currentTab) {
                 BottomTab.FOR_YOU -> viewModel.avisoConexion
                 BottomTab.SAVED -> if (viewModel.modoRespaldo || !viewModel.hayConexion) "Offline: your saved places are shown from this phone." else null
+                BottomTab.MAP -> if (viewModel.modoRespaldo || !viewModel.hayConexion) "Offline: the map uses the spots saved on this phone. Pins open their saved info." else null
                 else -> null
             }
             aviso?.let { texto -> AvisoSinConexion(texto = texto, alReintentar = viewModel::cargarSitios) }
@@ -191,6 +198,13 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                     alVerPopularidad = { viendoPopularidad = true },
                     modifier = contentModifier,
                     tiemposEspera = viewModel.tiemposEspera,
+                    seccionMejorParaTi = {
+                        SeccionMejorParaTi(
+                            estado = viewModel.mejorParaTi,
+                            alAbrirSitio = abrirPorId,
+                            alEditarGusto = { editandoGusto = true },
+                        )
+                    },
                     seccionCercanos = {
                         SeccionCercanos(
                             conSesion = viewModel.sesion != null,
@@ -204,9 +218,10 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                     },
                 )
                 BottomTab.MAP -> PantallaMapa(
-                    alAbrirLugar = { mapSpot ->
-                        spots.firstOrNull { it.name == mapSpot.name }?.let(viewModel::abrirSitio)
-                    },
+                    spots = spots,
+                    tiemposEspera = viewModel.tiemposEspera,
+                    // Por id: antes se buscaba por nombre y los pines de restaurantes inventados no abrian nada.
+                    alAbrirSitio = abrirPorId,
                     modifier = contentModifier,
                 )
                 BottomTab.SAVED -> PantallaGuardados(
@@ -218,7 +233,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                 )
                 BottomTab.PROFILE -> PantallaPerfil(
                     savedCount = spots.count { it.isSaved },
-                    perfil = perfilGusto,
+                    perfil = viewModel.perfilGusto,
                     alEditarGusto = { editandoGusto = true },
                     modifier = contentModifier,
                     correoSesion = viewModel.sesion?.email,

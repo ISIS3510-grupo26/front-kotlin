@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.model.ActividadSitio
 import com.example.frontend.model.PopularidadPorHora
 import com.example.frontend.model.RankingHora
+import com.example.frontend.model.textoHaceCuanto
 import com.example.frontend.ui.components.ChipPildora
 import com.example.frontend.ui.components.InsigniaRanking
 import com.example.frontend.ui.theme.AppColors
@@ -69,6 +70,7 @@ fun PantallaPopularidad(
     alAbrirSitio: (spotId: String) -> Unit,
     alVolver: () -> Unit,
     modifier: Modifier = Modifier,
+    hayConexion: Boolean = true,
 ) {
     var horaElegida by rememberSaveable { mutableStateOf(horaActual) }
     var estado by remember { mutableStateOf<EstadoPantalla>(EstadoPantalla.Cargando) }
@@ -84,6 +86,11 @@ fun PantallaPopularidad(
         } catch (e: Exception) {
             EstadoPantalla.Error
         }
+    }
+    // Conectividad eventual: si se esta viendo la copia guardada (o el error) y vuelve la red, se recarga solo.
+    LaunchedEffect(hayConexion) {
+        val desactualizado = estado == EstadoPantalla.Error || (estado as? EstadoPantalla.Listo)?.datos?.guardadoEn != null
+        if (hayConexion && desactualizado) intento++
     }
     // Al entrar, los chips arrancan centrados en la hora actual.
     LaunchedEffect(Unit) { chipsState.scrollToItem((horaActual - 2).coerceAtLeast(0)) }
@@ -128,7 +135,12 @@ fun PantallaPopularidad(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text("Couldn't load the ranking. Check your connection.", fontSize = 13.sp, color = AppColors.muted)
+                    Text(
+                        if (hayConexion) "Couldn't load the ranking. Check your connection."
+                        else "You're offline and there's no saved ranking on this phone yet. It will load when you reconnect.",
+                        fontSize = 13.sp,
+                        color = AppColors.muted,
+                    )
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = { intento++ },
@@ -137,6 +149,20 @@ fun PantallaPopularidad(
                     ) { Text("Retry", fontWeight = FontWeight.ExtraBold) }
                 }
                 is EstadoPantalla.Listo -> {
+                    actual.datos.guardadoEn?.let { guardadoEn ->
+                        val hace = textoHaceCuanto(((System.currentTimeMillis() - guardadoEn) / 60_000L).toInt())
+                        Text(
+                            if (hayConexion) "Couldn't reach CampusBites · showing the last ranking saved $hace."
+                            else "Offline · showing the last ranking saved $hace. It refreshes when you reconnect.",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.tomato,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(AppColors.tomatoLight)
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                    }
                     val ranking = actual.datos.horas.firstOrNull { it.hour == horaElegida }
                         ?: RankingHora(horaElegida, 0, 0, emptyList())
                     ListaRanking(ranking = ranking, dias = actual.datos.days, alAbrirSitio = alAbrirSitio, cargarBusquedasPorDia = cargarBusquedasPorDia)

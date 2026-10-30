@@ -38,6 +38,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.frontend.data.BusquedasPorDiaRepository
 import com.example.frontend.model.BusquedasPorDiaSemana
+import com.example.frontend.data.MejorParaTiRepository
+import com.example.frontend.data.OrigenMejorParaTi
+import com.example.frontend.data.ResenasRepository
+import com.example.frontend.data.gusto.AlmacenGusto
+import com.example.frontend.data.local.Borrador
+import com.example.frontend.data.local.ResenaPendienteEntidad
+import com.example.frontend.model.SitioMejorParaTi
+import com.example.frontend.model.TasteProfile
+import com.example.frontend.model.rankearMejorParaTi
 
 data class EstadoDetalle(
     val spot: Spot,
@@ -63,11 +72,19 @@ data class EstadoLogin(
     val error: String? = null,
 )
 
+// BQ6 "Best for you right now": todos los restaurantes ordenados por espera + gusto.
+data class EstadoMejorParaTi(
+    val lista: List<SitioMejorParaTi> = emptyList(),
+    val cargando: Boolean = false,
+    val aviso: String? = null,           // p. ej. "Offline · using wait times saved on this phone"
+)
+
 // Estado de la feature "Popular right now" (respuesta de la BQ3 para la hora actual del celular).
 data class EstadoPopularidad(
     val ahora: RankingHora? = null,
     val cargando: Boolean = true,
     val error: Boolean = false,
+    val guardadoEn: Long? = null,        // con valor: sin red, es el ultimo ranking guardado en el celular
 )
 
 // Dueño del estado de la app. La UI solo observa y envía eventos.
@@ -81,17 +98,40 @@ class CampusBitesViewModel(
     private val sesionRepository: SesionRepository = SesionRepository(ApiClient.api, Dependencias.almacenSesion),
     private val recomendacionesRepository: RecomendacionesRepository = RecomendacionesRepository(ApiClient.api),
     private val ubicacion: ProveedorUbicacion = Dependencias.proveedorUbicacion,
+    private val almacenGusto: AlmacenGusto = Dependencias.almacenGusto,
+    private val mejorParaTiRepository: MejorParaTiRepository = MejorParaTiRepository(ApiClient.api),
+    private val resenasRepository: ResenasRepository = ResenasRepository(),
 ) : ViewModel() {
 
-    // Los guardados viven en el dispositivo; arrancan con los del diseño original.
+    // Los guardados viven en DataStore (sobreviven a cerrar la app). Mientras se leen, y si el estudiante
+    // nunca ha tocado un corazon, se usan los del diseño original.
     private var savedIds by mutableStateOf(sampleSpots.filter { it.isSaved }.map { it.id }.toSet())
     private var catalogo by mutableStateOf<List<Spot>>(emptyList())
 
-    // Reseñas escritas en este celular. Se guardan aparte para que no desaparezcan cuando
-    // el detalle se vuelve a pedir al backend (que todavia no las tiene).
+    // Reseñas escritas en este celular que todavia esperan en la cola de Room. Se muestran aparte para
+    // que no desaparezcan cuando el detalle se vuelve a pedir al backend (que todavia no las tiene).
     private var resenasLocales by mutableStateOf<Map<String, List<PeerReview>>>(emptyMap())
 
-    val spots: List<Spot> get() = catalogo.map { it.conResenasLocales().copy(isSaved = it.id in savedIds) }
+    // Perfil de gusto guardado en DataStore; la pantalla Taste Profile lo edita sin necesitar red.
+    var perfilGusto by mutableStateOf(TasteProfile())
+        private set
+
+    var mejorParaTi by mutableStateOf(EstadoMejorParaTi())
+        private set
+
+    // spotId -> compatibilidad con el perfil, sacada del ultimo ranking de la BQ6.
+    private val compatibilidades: Map<String, Int>
+        get() = mejorParaTi.lista.associate { it.candidato.spotId to it.compatibilidad }
+
+    // affinityPercent deja de ser el numero escrito a mano en el catalogo: es la compatibilidad real.
+    // Mientras el primer ranking no ha terminado se calcula directo con el perfil (son 7 restaurantes).
+    val spots: List<Spot>
+        get() = catalogo.map { spot ->
+            spot.conResenasLocales().copy(
+                isSaved = spot.id in savedIds,
+                affinityPercent = compatibilidades[spot.id] ?: perfilGusto.compatibilidad(spot),
+            )
+        }
 
     var cargandoLista by mutableStateOf(true)
         private set
@@ -125,6 +165,7 @@ class CampusBitesViewModel(
 
     private var detalleJob: Job? = null
     private var recomendacionesJob: Job? = null
+    private var mejorParaTiJob: Job? = null
 
     init {
         cargarSitios()
@@ -134,6 +175,8 @@ class CampusBitesViewModel(
         observarSincronizacion()
         restaurarSesion()
         observarSesion()
+        observarGusto()
+        observarResenasPendientes()
     }
 
     // Texto del aviso de la parte de arriba; null si todo viene de la red.
@@ -156,6 +199,8 @@ class CampusBitesViewModel(
             origenCatalogo = resultado.origen
             catalogoGuardadoEn = resultado.guardadoEn
             cargandoLista = false
+            // Sin red la BQ6 se arma con este catalogo, asi que se calcula cuando ya esta cargado.
+            cargarMejorParaTi()
         }
     }
 
@@ -168,8 +213,14 @@ class CampusBitesViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Sin red no hay ranking: la seccion se oculta y la app sigue funcionando.
-                popularidad = popularidad.copy(cargando = false, error = true)
+                // Sin red se usa el ultimo ranking guardado; si nunca hubo uno, la seccion se oculta.
+                val guardado = popularidadRepository.rankingAhoraGuardado()
+                popularidad = popularidad.copy(
+                    ahora = guardado?.first ?: popularidad.ahora,
+                    guardadoEn = guardado?.second,
+                    cargando = false,
+                    error = true,
+                )
             }
         }
     }
@@ -178,6 +229,8 @@ class CampusBitesViewModel(
     fun cargarTiemposEspera() {
         viewModelScope.launch {
             tiemposEspera = tiemposEsperaRepository.cargar().tiempos
+            // Si la BQ6 se armo (o se esta armando) con los tiempos locales, se recalcula con estos.
+            if (mejorParaTi.aviso != null || mejorParaTiJob?.isActive == true) cargarMejorParaTi()
         }
     }
 
@@ -186,6 +239,53 @@ class CampusBitesViewModel(
             val anterior = tiemposEspera[spotId]
             val nuevo = tiemposEsperaRepository.reportar(spotId, minutos)
             tiemposEspera = tiemposEspera + (spotId to nuevo.copy(reportesRecientes = (anterior?.reportesRecientes ?: 0) + 1))
+            // Una espera nueva cambia el ranking de la BQ6 aunque todavia no haya llegado al backend.
+            cargarMejorParaTi()
+        }
+    }
+
+    // ---------- BQ6: Best for you right now ----------
+
+    // Multi-threading: la corrutina arranca en Main (viewModelScope). Adentro, withContext(IO) lanza dos
+    // async en paralelo: leer el perfil de gusto de DataStore y pedir la BQ6 a la red (con la copia local
+    // de respaldo). No dependen una de la otra, asi que esperar las dos juntas tarda lo que tarde la mas
+    // lenta y no la suma. Rankear es solo CPU (puntajes y orden), por eso va en Dispatchers.Default.
+    // Al salir de cada withContext se vuelve a Main, que es donde se asigna el estado que lee Compose.
+    fun cargarMejorParaTi() {
+        mejorParaTiJob?.cancel()
+        mejorParaTi = mejorParaTi.copy(cargando = true)
+        val catalogoActual = catalogo
+        val tiemposActuales = tiemposEspera
+        mejorParaTiJob = viewModelScope.launch {
+            val (perfil, resultado) = withContext(Dispatchers.IO) {
+                val lecturaPerfil = async { almacenGusto.perfilActual() }
+                val lecturaBq6 = async { mejorParaTiRepository.candidatos(catalogoActual, tiemposActuales) }
+                lecturaPerfil.await() to lecturaBq6.await()
+            }
+            val ranking = withContext(Dispatchers.Default) { rankearMejorParaTi(resultado.candidatos, perfil) }
+            mejorParaTi = EstadoMejorParaTi(
+                lista = ranking,
+                aviso = if (resultado.origen == OrigenMejorParaTi.COPIA_LOCAL) MENSAJE_MEJOR_PARA_TI_OFFLINE else null,
+            )
+        }
+    }
+
+    // El perfil vive en DataStore: aqui solo se refleja en la UI cada vez que cambia.
+    private fun observarGusto() {
+        viewModelScope.launch {
+            almacenGusto.perfil.collect { perfilGusto = it }
+        }
+        viewModelScope.launch {
+            almacenGusto.favoritos.collect { guardados -> if (guardados != null) savedIds = guardados }
+        }
+    }
+
+    // Guardar no necesita red. Al terminar se recalcula la BQ6 con el perfil nuevo.
+    fun guardarPerfilGusto(perfil: TasteProfile) {
+        perfilGusto = perfil
+        viewModelScope.launch {
+            almacenGusto.guardarPerfil(perfil)
+            cargarMejorParaTi()
         }
     }
 
@@ -202,7 +302,7 @@ class CampusBitesViewModel(
     }
 
     private fun alVolverLaConexion() {
-        if (modoRespaldo) cargarSitios()
+        if (modoRespaldo) cargarSitios() else if (mejorParaTi.aviso != null) cargarMejorParaTi()
         if (sesion != null && (recomendaciones.error != null || recomendaciones.aviso != null)) cargarRecomendaciones(forzar = true)
         val actual = estadoDetalle
         if (actual != null && (actual.error != null || actual.aviso != null)) reintentarDetalle()
@@ -216,7 +316,10 @@ class CampusBitesViewModel(
     private fun observarSincronizacion() {
         viewModelScope.launch {
             Dependencias.sincronizador.ultimaSincronizacion.collect {
-                if (tiemposEspera.values.any { it.pendienteDeEnvio }) cargarTiemposEspera()
+                if (tiemposEspera.values.any { it.pendienteDeEnvio }) {
+                    cargarTiemposEspera()
+                    cargarMejorParaTi()
+                }
             }
         }
     }
@@ -229,7 +332,9 @@ class CampusBitesViewModel(
     fun estaGuardado(id: String) = id in savedIds
 
     fun marcarGuardado(id: String) {
-        savedIds = if (id in savedIds) savedIds - id else savedIds + id
+        val nuevos = if (id in savedIds) savedIds - id else savedIds + id
+        savedIds = nuevos
+        viewModelScope.launch { almacenGusto.guardarFavoritos(nuevos) }
     }
 
     fun buscarSitio(id: String): Spot? = spots.firstOrNull { it.id == id }
@@ -283,19 +388,57 @@ class CampusBitesViewModel(
         cargarPopularidad(forzar = true)
     }
 
-    // Las reseñas escritas en la app viven en memoria mientras el backend no las persista.
-    fun agregarResena(spotId: String, estrellas: Int, texto: String) {
-        val nueva = PeerReview(
-            authorName = "Julian Bierez",
-            initials = "JB",
-            program = "Engineering, Sem 6",
-            stars = estrellas,
-            text = texto,
-            dinedAgo = "Dined today",
-            helpfulCount = 0,
-        )
-        resenasLocales = resenasLocales + (spotId to listOf(nueva) + resenasLocales[spotId].orEmpty())
+    // ---------- Reseñas (Write a Review) ----------
+
+    // La reseña entra primero a la cola de Room: con o sin red queda a salvo y se ve de una vez en el detalle.
+    // SincronizadorPendientes la envia cuando haya conexion y sesion.
+    fun publicarResena(spotId: String, estrellas: Int, texto: String) {
+        viewModelScope.launch { resenasRepository.publicar(spotId, estrellas, texto) }
     }
+
+    suspend fun leerBorrador(spotId: String): Borrador? = resenasRepository.leerBorrador(spotId)
+
+    suspend fun guardarBorrador(spotId: String, estrellas: Int, texto: String) =
+        resenasRepository.guardarBorrador(spotId, estrellas, texto)
+
+    // Cuando una reseña sale de la cola es porque el backend ya la tiene. Si el estudiante esta viendo ese
+    // restaurante, se vuelve a pedir el detalle para que aparezca como reseña publicada.
+    private fun observarResenasPendientes() {
+        viewModelScope.launch {
+            var antes = emptySet<String>()
+            resenasRepository.pendientes.collect { cola ->
+                resenasLocales = cola.groupBy { it.spotId }.mapValues { (_, lista) -> lista.map { it.aPeerReview() } }
+                val ahora = cola.map { it.spotId }.toSet()
+                val enviadas = antes - ahora
+                antes = ahora
+                estadoDetalle?.spot?.id?.takeIf { it in enviadas }?.let(::refrescarDetalle)
+            }
+        }
+    }
+
+    // Igual que abrirSitio pero sin cronometro: no es una carga que pidio el usuario, asi que no va a la telemetria.
+    private fun refrescarDetalle(spotId: String) {
+        viewModelScope.launch {
+            try {
+                val completo = repository.obtenerSitio(spotId)
+                if (estadoDetalle?.spot?.id == spotId) estadoDetalle = EstadoDetalle(spot = completo, cargando = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Si falla, se queda la version que ya se esta mostrando.
+            }
+        }
+    }
+
+    private fun ResenaPendienteEntidad.aPeerReview() = PeerReview(
+        authorName = "You",
+        initials = sesion?.email?.take(2)?.uppercase() ?: "ME",
+        program = if (sesion == null) "Sign in to post it" else "Waiting to be posted",
+        stars = estrellas,
+        text = texto,
+        dinedAgo = textoHaceCuanto(((System.currentTimeMillis() - creadaEn) / 60_000L).toInt()),
+        helpfulCount = 0,
+    )
 
     private fun Spot.conResenasLocales(): Spot {
         val propias = resenasLocales[id].orEmpty()
@@ -317,7 +460,11 @@ class CampusBitesViewModel(
                 val antes = sesion
                 sesion = guardada
                 if (guardada == null && antes != null) recomendaciones = EstadoRecomendaciones()
-                if (guardada != null && antes?.userId != guardada.userId) cargarRecomendaciones()
+                if (guardada != null && antes?.userId != guardada.userId) {
+                    cargarRecomendaciones()
+                    // Las reseñas que se escribieron sin sesion ya tienen a nombre de quien publicarse.
+                    Dependencias.programarSincronizacion()
+                }
             }
         }
     }
@@ -403,5 +550,6 @@ class CampusBitesViewModel(
     private companion object {
         const val MENSAJE_LOGIN_OFFLINE = "You're offline. Signing in needs a connection; you can keep browsing meanwhile."
         const val MENSAJE_PICKS_OFFLINE = "You're offline. Picks near you will load when you reconnect."
+        const val MENSAJE_MEJOR_PARA_TI_OFFLINE = "Offline · using the wait times saved on this phone"
     }
 }

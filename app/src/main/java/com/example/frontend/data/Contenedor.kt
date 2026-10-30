@@ -2,6 +2,7 @@ package com.example.frontend.data
 
 import android.content.Context
 import com.example.frontend.data.conectividad.MonitorConectividad
+import com.example.frontend.data.gusto.AlmacenGusto
 import com.example.frontend.data.local.BaseDatosLocal
 import com.example.frontend.data.remote.ApiClient
 import com.example.frontend.data.remote.CampusBitesApi
@@ -28,6 +29,8 @@ object Dependencias {
         private set
     lateinit var almacenSesion: AlmacenSesion
         private set
+    lateinit var almacenGusto: AlmacenGusto
+        private set
     lateinit var proveedorUbicacion: ProveedorUbicacion
         private set
     lateinit var carpetaArchivos: File
@@ -43,8 +46,14 @@ object Dependencias {
         appContext = context.applicationContext
         baseDatos = BaseDatosLocal.crear(appContext)
         monitorConectividad = MonitorConectividad(appContext)
-        sincronizador = SincronizadorPendientes(api, baseDatos.pendientesDao())
         almacenSesion = AlmacenSesion(appContext)
+        almacenGusto = AlmacenGusto(appContext)
+        sincronizador = SincronizadorPendientes(
+            api,
+            baseDatos.pendientesDao(),
+            baseDatos.resenasPendientesDao(),
+            tokenGuardado = { almacenSesion.actual()?.takeIf { !it.vencida() }?.token },
+        )
         proveedorUbicacion = ProveedorUbicacion(UbicacionGps(appContext))
         carpetaArchivos = appContext.filesDir
         // Si el backend responde 401 (token vencido o contrasena cambiada), se borra la sesion guardada.

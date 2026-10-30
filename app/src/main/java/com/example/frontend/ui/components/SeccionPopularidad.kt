@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.frontend.model.ActividadSitio
+import com.example.frontend.model.textoHaceCuanto
 import com.example.frontend.ui.EstadoPopularidad
 import com.example.frontend.ui.theme.AppColors
 
@@ -54,7 +55,8 @@ fun SeccionPopularidad(
         }
         return
     }
-    if (ranking.sitios.isEmpty()) return
+    // Offline se deja el encabezado aunque la hora este vacia: es la entrada a "Popular by hour" guardado.
+    if (ranking.sitios.isEmpty() && estado.guardadoEn == null) return
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -69,7 +71,9 @@ fun SeccionPopularidad(
                     color = AppColors.espresso,
                 )
                 Text(
-                    "${ranking.totalPageViews} views · ${ranking.totalSearches} searches at this hour this week",
+                    estado.guardadoEn?.let {
+                        "Offline · ranking saved ${textoHaceCuanto(((System.currentTimeMillis() - it) / 60_000L).toInt())}"
+                    } ?: "${ranking.totalPageViews} views · ${ranking.totalSearches} searches at this hour this week",
                     fontSize = 12.sp,
                     color = AppColors.muted,
                 )

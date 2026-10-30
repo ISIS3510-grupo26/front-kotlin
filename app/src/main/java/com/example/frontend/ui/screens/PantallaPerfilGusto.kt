@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -36,24 +37,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.frontend.model.TasteProfile
 import com.example.frontend.ui.components.ChipSeleccionable
 import com.example.frontend.ui.components.TarjetaCocina
 import com.example.frontend.ui.components.TarjetaPresupuesto
 import com.example.frontend.ui.theme.AppColors
 
+// Funciona 100% sin red: el perfil se lee y se guarda en DataStore y los "Taste Matches" se calculan en el
+// celular (TasteProfile.compatibilidad). El backend nunca recibe el perfil.
 @Composable
 fun PantallaPerfilGusto(
     perfilInicial: TasteProfile,
     alGuardar: (TasteProfile) -> Unit,
     alVolver: () -> Unit,
     modifier: Modifier = Modifier,
+    hayConexion: Boolean = true,
 ) {
-    var selectedFaculty by remember { mutableStateOf(perfilInicial.faculty) }
-    var selectedBudget by remember { mutableStateOf(perfilInicial.budget) }
-    var selectedDietary by remember { mutableStateOf(perfilInicial.dietary) }
-    var selectedCuisines by remember { mutableStateOf(perfilInicial.cuisines) }
-    var selectedSpice by remember { mutableStateOf(perfilInicial.spice) }
+    // Con perfilInicial como llave: si DataStore termina de leer despues de abrir la pantalla, se ve lo guardado.
+    var selectedFaculty by remember(perfilInicial) { mutableStateOf(perfilInicial.faculty) }
+    var selectedBudget by remember(perfilInicial) { mutableStateOf(perfilInicial.budget) }
+    var selectedDietary by remember(perfilInicial) { mutableStateOf(perfilInicial.dietary) }
+    var selectedCuisines by remember(perfilInicial) { mutableStateOf(perfilInicial.cuisines) }
+    var selectedSpice by remember(perfilInicial) { mutableStateOf(perfilInicial.spice) }
 
     Scaffold(
         modifier = modifier,
@@ -146,6 +152,25 @@ fun PantallaPerfilGusto(
                         color = AppColors.mint,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                }
+            }
+
+            if (!hayConexion) {
+                Spacer(Modifier.height(10.dp))
+                Surface(shape = RoundedCornerShape(16.dp), color = AppColors.tomatoLight) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Icon(Icons.Filled.CloudOff, contentDescription = null, tint = AppColors.tomato, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "You're offline, and that's fine: your taste profile is saved on this phone and your matches are calculated here.",
+                            color = AppColors.tomato,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
 

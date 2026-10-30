@@ -74,6 +74,7 @@ fun PantallaParaTi(
     alVerPopularidad: () -> Unit,
     modifier: Modifier = Modifier,
     tiemposEspera: Map<String, TiempoEspera> = emptyMap(),
+    seccionMejorParaTi: @Composable () -> Unit = {},
     seccionCercanos: @Composable () -> Unit = {},
 ) {
     val filters = remember { FiltrosFeed(listOf(FeedFilterType.IN_A_RUSH)) }
@@ -100,6 +101,7 @@ fun PantallaParaTi(
                 // "Popular right now" (BQ3) se desplaza con el feed y solo aparece cuando hay datos.
                 encabezado = {
                     Column {
+                        seccionMejorParaTi()
                         seccionCercanos()
                         SeccionPopularidad(
                             estado = popularidad,

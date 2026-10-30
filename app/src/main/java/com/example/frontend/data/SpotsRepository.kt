@@ -98,6 +98,9 @@ private fun SpotDto.toModel() = Spot(
     price = price,
     distance = distance,
     walkMinutes = walkMinutes,
+    // Una copia de Room guardada antes de que el backend mandara coordenadas no las trae: se toman del catalogo empaquetado.
+    latitude = latitude ?: sampleSpots.firstOrNull { it.id == id }?.latitude,
+    longitude = longitude ?: sampleSpots.firstOrNull { it.id == id }?.longitude,
     isBudget = isBudget,
     isVegetarian = isVegetarian,
     isHighProtein = isHighProtein,
