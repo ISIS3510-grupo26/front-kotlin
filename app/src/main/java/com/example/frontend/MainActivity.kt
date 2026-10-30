@@ -20,16 +20,20 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.frontend.data.remote.PERMISO_RED_LOCAL
+import com.example.frontend.data.remote.necesitaPermisoRedLocal
 import com.example.frontend.ui.CampusBitesViewModel
 import com.example.frontend.ui.components.BarraInferior
 import com.example.frontend.ui.components.BottomTab
@@ -75,6 +79,15 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
     }
     val solicitarPermisoUbicacion = {
         pedirUbicacion.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    // Android 17: sin este permiso las peticiones a un backend local (emulador o PC) se quedan colgadas.
+    val context = LocalContext.current
+    val pedirRedLocal = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
+        if (concedido) viewModel.alCambiarPermisoRedLocal()
+    }
+    LaunchedEffect(Unit) {
+        if (necesitaPermisoRedLocal(context)) pedirRedLocal.launch(PERMISO_RED_LOCAL)
     }
 
     val spots = viewModel.spots

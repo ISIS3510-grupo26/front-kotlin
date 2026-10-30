@@ -74,8 +74,8 @@ class UbicacionGps(private val context: Context) : FuenteUbicacion {
 // Estrategia 2: el centro del campus. Se usa si el estudiante no dio permiso o tiene el GPS apagado,
 // para que la recomendacion siga funcionando (menos precisa) en vez de quedar vacia.
 object UbicacionCampus : FuenteUbicacion {
-    private const val LAT = 4.6018
-    private const val LNG = -74.0658
+    const val LAT = 4.6018
+    const val LNG = -74.0658
 
     override suspend fun obtener() = Ubicacion(LAT, LNG, OrigenUbicacion.CAMPUS)
 }

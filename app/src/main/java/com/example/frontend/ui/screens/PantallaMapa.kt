@@ -1,11 +1,31 @@
 package com.example.frontend.ui.screens
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.drawable.BitmapDrawable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.frontend.data.ubicacion.UbicacionCampus
+import java.io.File
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.Marker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,6 +47,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,9 +55,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,8 +70,9 @@ import com.example.frontend.model.TiempoEspera
 import com.example.frontend.ui.theme.AppColors
 import androidx.compose.material.icons.filled.MyLocation
 
-// Los pines salen del catalogo que ya tiene el ViewModel (red, Room o empaquetado), asi que el mapa
-// se dibuja igual sin conexion. El aviso offline lo pone MainActivity arriba de la pestaña.
+// Mapa real de Uniandes (OpenStreetMap) con un pin en las coordenadas de cada restaurante. Los pines salen
+// del catalogo que ya tiene el ViewModel (red, Room o empaquetado), asi que se dibujan igual sin conexion;
+// sin red solo se ven las teselas que ya estaban en cache. El aviso offline lo pone MainActivity.
 @Composable
 fun PantallaMapa(
     spots: List<Spot>,
@@ -135,50 +159,53 @@ private fun AreaMapa(
     alAbrirLugar: (MapSpot) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier = modifier.background(Color(0xFFD9EDE2))) {
-        val w = maxWidth
-        val h = maxHeight
+    val context = LocalContext.current
+    val mapa = remember { crearMapa(context) }
+    // La camara se encuadra una sola vez: si se moviera con cada cambio de pines, el estudiante perderia
+    // el zoom que eligio cada vez que llega un tiempo de espera nuevo.
+    var encuadrado by remember { mutableStateOf(false) }
 
-        ZonaBloque(width = 120.dp, height = 90.dp, color = Color(0xFFE4D5CC), left = w * 0.05f, top = h * 0.08f)
-        ZonaBloque(width = 140.dp, height = 70.dp, color = Color(0xFFF2CFC6), left = w * 0.45f, top = h * 0.05f)
-        ZonaBloque(width = 90.dp, height = 110.dp, color = Color(0xFFE4D5CC), left = w * 0.7f, top = h * 0.3f)
-        ZonaBloque(width = 100.dp, height = 80.dp, color = Color(0xFFF2CFC6), left = w * 0.08f, top = h * 0.45f)
-        ZonaBloque(width = 130.dp, height = 95.dp, color = Color(0xFFE4D5CC), left = w * 0.4f, top = h * 0.55f)
-        ZonaBloque(width = 110.dp, height = 75.dp, color = Color(0xFFF2CFC6), left = w * 0.65f, top = h * 0.68f)
+    // osmdroid necesita enterarse del ciclo de vida para pausar la descarga de teselas y liberar memoria.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle, mapa) {
+        val observador = LifecycleEventObserver { _, evento ->
+            when (evento) {
+                Lifecycle.Event.ON_RESUME -> mapa.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapa.onPause()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observador)
+        onDispose {
+            lifecycle.removeObserver(observador)
+            mapa.onDetach()
+        }
+    }
 
-        Box(Modifier.offset(x = 0.dp, y = h * 0.27f).width(w).height(14.dp).background(AppColors.cream))
-        Box(Modifier.offset(x = 0.dp, y = h * 0.62f).width(w).height(14.dp).background(AppColors.cream))
-        Box(Modifier.offset(x = w * 0.32f, y = 0.dp).width(14.dp).height(h).background(AppColors.cream))
-        Box(Modifier.offset(x = w * 0.78f, y = 0.dp).width(14.dp).height(h).background(AppColors.cream))
-
-        EtiquetaZona("SCIENCE QUAD", Modifier.align(Alignment.TopStart).padding(16.dp))
-        EtiquetaZona("ENGINEERING HUB", Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 16.dp))
-        EtiquetaZona("STUDENT UNION", Modifier.align(Alignment.BottomStart).padding(bottom = 140.dp, start = 16.dp))
-        EtiquetaZona("SPORTS ARENA", Modifier.align(Alignment.BottomEnd).padding(bottom = 110.dp, end = 16.dp))
+    // clipToBounds: sin esto el MapView pinta teselas por fuera de su area, encima de la barra de busqueda.
+    Box(modifier = modifier.clipToBounds().background(Color(0xFFD9EDE2))) {
+        AndroidView(
+            factory = { mapa },
+            update = { vista ->
+                dibujarPines(vista, spots, seleccionado?.spotId, alSeleccionar)
+                if (!encuadrado && spots.isNotEmpty()) {
+                    encuadrado = true
+                    vista.post { encuadrar(vista, spots) }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
 
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
                 .size(44.dp)
-                .background(AppColors.card, CircleShape),
+                .background(AppColors.card, CircleShape)
+                .clickable { encuadrar(mapa, spots) },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.MyLocation, contentDescription = "Mi ubicación", tint = AppColors.espresso)
-        }
-
-        // El seleccionado se dibuja de ultimo para que quede encima si dos pines se tocan.
-        spots.sortedBy { it.spotId == seleccionado?.spotId }.forEach { spot ->
-            // La caja mide ANCHO_PIN y el pin va centrado: la punta de abajo cae justo en la coordenada.
-            // Antes se restaba un valor fijo y la punta quedaba corrida segun el ancho del texto.
-            Box(
-                modifier = Modifier
-                    .offset(x = w * spot.dx - ANCHO_PIN / 2, y = h * spot.dy - ALTO_PIN)
-                    .width(ANCHO_PIN),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Pin(spot = spot, selected = spot.spotId == seleccionado?.spotId, onTap = { alSeleccionar(spot) })
-            }
+            Icon(Icons.Filled.MyLocation, contentDescription = "Centrar en el campus", tint = AppColors.espresso)
         }
 
         if (seleccionado == null) {
@@ -186,7 +213,10 @@ private fun AreaMapa(
                 "No spots with a location to show yet.",
                 fontSize = 13.sp,
                 color = AppColors.muted,
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(AppColors.card, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             )
         } else {
             TarjetaLugarSeleccionado(
@@ -200,62 +230,109 @@ private fun AreaMapa(
     }
 }
 
-private val ANCHO_PIN = 80.dp
-private val ALTO_PIN = 42.dp
-
-@Composable
-private fun ZonaBloque(width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp, color: Color, left: androidx.compose.ui.unit.Dp, top: androidx.compose.ui.unit.Dp) {
-    Box(
-        modifier = Modifier
-            .offset(x = left, y = top)
-            .width(width)
-            .height(height)
-            .background(color, RoundedCornerShape(16.dp)),
-    )
-}
-
-@Composable
-private fun EtiquetaZona(label: String, modifier: Modifier = Modifier) {
-    Text(
-        label,
-        modifier = modifier,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.2.sp,
-        color = AppColors.muted,
-    )
-}
-
-@Composable
-private fun Pin(spot: MapSpot, selected: Boolean, onTap: () -> Unit, modifier: Modifier = Modifier) {
-    val color = if (selected) AppColors.tomato else AppColors.espresso
-    Column(
-        modifier = modifier.clickable { onTap() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            modifier = Modifier
-                .background(color, RoundedCornerShape(999.dp))
-                .then(
-                    if (selected) Modifier.border(3.dp, Color.White, RoundedCornerShape(999.dp))
-                    else Modifier
-                )
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(spot.emoji, fontSize = 14.sp)
-            Spacer(Modifier.width(4.dp))
-            Text("${spot.affinity}%", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White)
-        }
-        Box(
-            modifier = Modifier
-                .offset(y = (-3).dp)
-                .size(8.dp)
-                .rotate(45f)
-                .background(color, RectangleShape),
-        )
+private fun crearMapa(context: Context): MapView {
+    // OpenStreetMap exige identificar la app en cada descarga y bloquea (403) a las que no lo hacen bien:
+    // con el nombre del paquete (com.example.frontend) devolvia "Access blocked" en vez del mapa.
+    // El cache va en almacenamiento interno: asi no se piden permisos de almacenamiento y lo ya visto
+    // del campus se sigue viendo sin red.
+    Configuration.getInstance().apply {
+        userAgentValue = "CampusBites/1.0 (Uniandes ISIS3510)"
+        osmdroidBasePath = File(context.filesDir, "osmdroid")
+        osmdroidTileCache = File(context.cacheDir, "osmdroid/tiles")
+    }
+    return MapView(context).apply {
+        setTileSource(TileSourceFactory.MAPNIK)
+        // Sin esto las calles y los nombres se ven diminutos en pantallas de alta densidad.
+        isTilesScaledToDpi = true
+        setMultiTouchControls(true)
+        zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+        minZoomLevel = 14.0
+        maxZoomLevel = 20.0
+        controller.setZoom(ZOOM_CAMPUS)
+        controller.setCenter(GeoPoint(UbicacionCampus.LAT, UbicacionCampus.LNG))
+        // La licencia de OpenStreetMap exige mostrar el credito sobre el mapa.
+        overlays.add(CopyrightOverlay(context))
     }
 }
+
+// Encuadra todos los restaurantes. La caja se estira hacia el sur porque la tarjeta del lugar
+// seleccionado tapa la parte de abajo del mapa; asi los pines quedan en la parte visible.
+private fun encuadrar(mapa: MapView, spots: List<MapSpot>) {
+    if (spots.isEmpty() || mapa.width == 0 || mapa.height == 0) {
+        mapa.controller.animateTo(GeoPoint(UbicacionCampus.LAT, UbicacionCampus.LNG), ZOOM_CAMPUS, 400L)
+        return
+    }
+    val norte = spots.maxOf { it.lat }
+    val sur = spots.minOf { it.lat }
+    val este = spots.maxOf { it.lng }
+    val oeste = spots.minOf { it.lng }
+    // Con un solo restaurante la caja mide 0 y el zoom se iria al maximo.
+    val alto = (norte - sur).coerceAtLeast(0.002)
+    val ancho = (este - oeste).coerceAtLeast(0.002)
+    val caja = BoundingBox(norte + alto * 0.25, este + ancho * 0.15, sur - alto * 0.9, oeste - ancho * 0.15)
+    mapa.zoomToBoundingBox(caja, true, 0)
+}
+
+private fun dibujarPines(mapa: MapView, spots: List<MapSpot>, seleccionadoId: String?, alSeleccionar: (MapSpot) -> Unit) {
+    mapa.overlays.removeAll { it is Marker }
+    // El seleccionado se agrega de ultimo para que quede encima si dos pines se tocan.
+    spots.sortedBy { it.spotId == seleccionadoId }.forEach { spot ->
+        val seleccionado = spot.spotId == seleccionadoId
+        mapa.overlays.add(
+            Marker(mapa).apply {
+                position = GeoPoint(spot.lat, spot.lng)
+                // La punta de abajo del pin cae justo en la coordenada del restaurante.
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = iconoPin(mapa.context, spot, seleccionado)
+                title = spot.name
+                setOnMarkerClickListener { _, _ ->
+                    alSeleccionar(spot)
+                    true
+                }
+            },
+        )
+    }
+    mapa.invalidate()
+}
+
+// El mismo pin que antes (emoji + % de compatibilidad en una pastilla) pero dibujado como imagen,
+// porque los marcadores de osmdroid son vistas de Android y no Compose.
+private fun iconoPin(context: Context, spot: MapSpot, seleccionado: Boolean): BitmapDrawable {
+    val d = context.resources.displayMetrics.density
+    val texto = "${spot.emoji} ${spot.affinity}%"
+    val pintura = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = 13 * d
+        typeface = Typeface.DEFAULT_BOLD
+    }
+    val borde = if (seleccionado) 3 * d else 0f
+    val anchoPastilla = pintura.measureText(texto) + 20 * d + 2 * borde
+    val altoPastilla = 32 * d + 2 * borde
+    val punta = 7 * d
+    val bitmap = Bitmap.createBitmap(anchoPastilla.toInt(), (altoPastilla + punta).toInt(), Bitmap.Config.ARGB_8888)
+    val lienzo = Canvas(bitmap)
+    val relleno = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = (if (seleccionado) AppColors.tomato else AppColors.espresso).toArgb()
+    }
+    if (seleccionado) {
+        val blanco = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE }
+        lienzo.drawRoundRect(RectF(0f, 0f, anchoPastilla, altoPastilla), altoPastilla / 2, altoPastilla / 2, blanco)
+    }
+    val interior = RectF(borde, borde, anchoPastilla - borde, altoPastilla - borde)
+    lienzo.drawRoundRect(interior, interior.height() / 2, interior.height() / 2, relleno)
+    val triangulo = Path().apply {
+        moveTo(anchoPastilla / 2 - punta, altoPastilla - borde - 1)
+        lineTo(anchoPastilla / 2 + punta, altoPastilla - borde - 1)
+        lineTo(anchoPastilla / 2, altoPastilla + punta)
+        close()
+    }
+    lienzo.drawPath(triangulo, relleno)
+    val baseTexto = interior.centerY() - (pintura.descent() + pintura.ascent()) / 2
+    lienzo.drawText(texto, borde + 10 * d, baseTexto, pintura)
+    return BitmapDrawable(context.resources, bitmap)
+}
+
+private const val ZOOM_CAMPUS = 17.0
 
 @Composable
 private fun TarjetaLugarSeleccionado(

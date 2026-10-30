@@ -301,6 +301,16 @@ class CampusBitesViewModel(
         }
     }
 
+    // Recien concedido el permiso de red local (Android 17) todo lo que se pidio al abrir habia fallado.
+    fun alCambiarPermisoRedLocal() {
+        cargarSitios()
+        cargarMejorParaTi()
+        cargarTiemposEspera()
+        cargarPopularidad(forzar = true)
+        if (sesion != null) cargarRecomendaciones(forzar = true)
+        Dependencias.programarSincronizacion()
+    }
+
     private fun alVolverLaConexion() {
         if (modoRespaldo) cargarSitios() else if (mejorParaTi.aviso != null) cargarMejorParaTi()
         if (sesion != null && (recomendaciones.error != null || recomendaciones.aviso != null)) cargarRecomendaciones(forzar = true)
