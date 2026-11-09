@@ -9,6 +9,7 @@ data class MenuItemDto(
     val description: String,
     val price: String,
     val isStudentPick: Boolean,
+    val imageUrl: String? = null,
 )
 
 data class ReviewDto(
@@ -45,6 +46,8 @@ data class SpotDto(
     // traen; Gson deja null y el mapa usa las del catalogo empaquetado.
     val latitude: Double? = null,
     val longitude: Double? = null,
+    // Foto del restaurante. Una copia de Room anterior a las fotos no la trae: queda null y se ve el emoji.
+    val imageUrl: String? = null,
     // Solo vienen en GET /spots/{id}.
     val menu: List<MenuItemDto>? = null,
     val reviews: List<ReviewDto>? = null,

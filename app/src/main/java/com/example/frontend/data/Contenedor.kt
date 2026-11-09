@@ -6,6 +6,7 @@ import com.example.frontend.data.gusto.AlmacenGusto
 import com.example.frontend.data.local.BaseDatosLocal
 import com.example.frontend.data.remote.ApiClient
 import com.example.frontend.data.remote.CampusBitesApi
+import com.example.frontend.data.remote.InterceptorConectividad
 import com.example.frontend.data.remote.TokenActual
 import com.example.frontend.data.sesion.AlmacenSesion
 import com.example.frontend.data.sincronizacion.SincronizadorPendientes
@@ -45,7 +46,10 @@ object Dependencias {
     fun iniciar(context: Context) {
         appContext = context.applicationContext
         baseDatos = BaseDatosLocal.crear(appContext)
-        monitorConectividad = MonitorConectividad(appContext)
+        monitorConectividad = MonitorConectividad(appContext, scopeApp)
+        // Cada peticion de Retrofit le cuenta al monitor si llego o si fallo por red.
+        InterceptorConectividad.alFallar = monitorConectividad::avisarFallaDeRed
+        InterceptorConectividad.alResponder = monitorConectividad::avisarRespuesta
         almacenSesion = AlmacenSesion(appContext)
         almacenGusto = AlmacenGusto(appContext)
         sincronizador = SincronizadorPendientes(

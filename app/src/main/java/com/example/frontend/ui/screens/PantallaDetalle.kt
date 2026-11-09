@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,9 +47,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.example.frontend.ui.acciones.abrirComoLlegar
+import com.example.frontend.ui.acciones.compartirSitio
+import com.example.frontend.ui.acciones.mostrarAviso
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +63,7 @@ import com.example.frontend.model.MenuItem
 import com.example.frontend.model.PeerReview
 import com.example.frontend.model.Spot
 import com.example.frontend.model.TiempoEspera
+import com.example.frontend.ui.components.FotoComida
 import com.example.frontend.ui.components.TarjetaEspera
 import com.example.frontend.ui.theme.AppColors
 
@@ -78,6 +85,7 @@ fun PantallaDetalle(
 ) {
     // El corazon sale del ViewModel (spot.isSaved), no de un estado local: antes se reiniciaba
     // al ir a escribir una reseña y volver.
+    val context = LocalContext.current
     Scaffold(
         modifier = modifier,
         containerColor = AppColors.cream,
@@ -86,6 +94,7 @@ fun PantallaDetalle(
                 isSaved = spot.isSaved,
                 walkLabel = spot.distance.replace(" walk", ""),
                 alMarcarGuardado = { alMarcarGuardado(spot.id) },
+                alPedirIndicaciones = { abrirComoLlegar(context, spot) },
             )
         },
     ) { innerPadding ->
@@ -96,6 +105,17 @@ fun PantallaDetalle(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         ) {
             item { Encabezado(spot = spot, alVolver = alVolver) }
+            item {
+                FotoComida(
+                    url = spot.imageUrl,
+                    emoji = spot.emoji,
+                    fondo = spot.emojiBackground,
+                    esquinas = 20.dp,
+                    tamanoEmoji = 56.sp,
+                    descripcion = spot.name,
+                    modifier = Modifier.fillMaxWidth().height(180.dp).padding(bottom = 12.dp),
+                )
+            }
             if (actualizando) {
                 item {
                     LinearProgressIndicator(
@@ -155,7 +175,8 @@ fun PantallaDetalle(
                     title = "Student Peer Reviews",
                     subtitle = "Community feedback from verified campus diners",
                 ) {
-                    Text("See all ${spot.totalReviews}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AppColors.tomato)
+                    // Antes decia "See all" pero no era un boton: todas las reseñas que manda el backend ya estan abajo.
+                    PildoraContador(label = "${spot.totalReviews} reviews")
                 }
                 Spacer(Modifier.size(12.dp))
             }
@@ -230,6 +251,7 @@ private fun ErrorDetalle(mensaje: String, alReintentar: () -> Unit) {
 
 @Composable
 private fun Encabezado(spot: Spot, alVolver: () -> Unit) {
+    val context = LocalContext.current
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
         IconButton(onClick = alVolver) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = AppColors.espresso)
@@ -261,7 +283,7 @@ private fun Encabezado(spot: Spot, alVolver: () -> Unit) {
                 modifier = Modifier.padding(top = 3.dp),
             )
         }
-        IconButton(onClick = { }) {
+        IconButton(onClick = { compartirSitio(context, spot) }) {
             Icon(Icons.Filled.Share, contentDescription = "Share", tint = AppColors.espresso)
         }
     }
@@ -322,6 +344,7 @@ private fun PildoraContador(label: String) {
 
 @Composable
 private fun FilaMenu(item: MenuItem) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -330,12 +353,15 @@ private fun FilaMenu(item: MenuItem) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.size(72.dp).background(item.emojiBackground, RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(item.emoji, fontSize = 32.sp)
-        }
+        FotoComida(
+            url = item.imageUrl,
+            emoji = item.emoji,
+            fondo = item.emojiBackground,
+            esquinas = 14.dp,
+            tamanoEmoji = 32.sp,
+            descripcion = item.name,
+            modifier = Modifier.size(72.dp),
+        )
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
             if (item.isStudentPick) {
                 Row(
@@ -358,7 +384,8 @@ private fun FilaMenu(item: MenuItem) {
             }
         }
         IconButton(
-            onClick = { },
+            // La app no hace pedidos: el boton recuerda el plato y el precio para pedirlo en la caja.
+            onClick = { mostrarAviso(context, "${item.name} · ${item.price} COP. Order it at the counter.") },
             modifier = Modifier.size(34.dp).background(AppColors.tomato, CircleShape),
         ) {
             Icon(Icons.Filled.Add, contentDescription = "Add ${item.name}", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -409,8 +436,16 @@ private fun TarjetaResena(review: PeerReview) {
         )
         Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(review.dinedAgo, fontSize = 11.sp, color = AppColors.muted, modifier = Modifier.weight(1f))
-            Icon(Icons.Filled.ThumbUp, contentDescription = null, tint = AppColors.muted, modifier = Modifier.size(13.dp))
-            Text(" Helpful (${review.helpfulCount})", fontSize = 11.sp, color = AppColors.muted)
+            // "Helpful" se marca y desmarca en este celular; el backend no tiene endpoint para votos.
+            var util by rememberSaveable(review.authorName, review.text) { mutableStateOf(false) }
+            val color = if (util) AppColors.tomato else AppColors.muted
+            Row(
+                modifier = Modifier.clickable { util = !util }.padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.ThumbUp, contentDescription = "Mark as helpful", tint = color, modifier = Modifier.size(13.dp))
+                Text(" Helpful (${review.helpfulCount + if (util) 1 else 0})", fontSize = 11.sp, color = color)
+            }
         }
     }
 }
@@ -430,7 +465,7 @@ private fun Estrellas(count: Int) {
 }
 
 @Composable
-private fun BarraAcciones(isSaved: Boolean, walkLabel: String, alMarcarGuardado: () -> Unit) {
+private fun BarraAcciones(isSaved: Boolean, walkLabel: String, alMarcarGuardado: () -> Unit, alPedirIndicaciones: () -> Unit) {
     Surface(color = AppColors.card, shadowElevation = 8.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -448,7 +483,7 @@ private fun BarraAcciones(isSaved: Boolean, walkLabel: String, alMarcarGuardado:
             }
             Spacer(Modifier.width(12.dp))
             Button(
-                onClick = { },
+                onClick = alPedirIndicaciones,
                 modifier = Modifier.weight(1f).size(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.tomato, contentColor = Color.White),

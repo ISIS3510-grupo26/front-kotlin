@@ -42,6 +42,7 @@ fun SeccionMejorParaTi(
     alAbrirSitio: (spotId: String) -> Unit,
     alEditarGusto: () -> Unit,
     modifier: Modifier = Modifier,
+    fotos: Map<String, String> = emptyMap(),   // spotId -> foto del restaurante (del catalogo)
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(bottom = 18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -75,7 +76,7 @@ fun SeccionMejorParaTi(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(estado.lista.take(MAXIMO_EN_FEED), key = { it.candidato.spotId }) { sitio ->
-                        TarjetaMejorParaTi(sitio, onClick = { alAbrirSitio(sitio.candidato.spotId) })
+                        TarjetaMejorParaTi(sitio, fotos[sitio.candidato.spotId], onClick = { alAbrirSitio(sitio.candidato.spotId) })
                     }
                 }
             }
@@ -84,7 +85,7 @@ fun SeccionMejorParaTi(
 }
 
 @Composable
-private fun TarjetaMejorParaTi(sitio: SitioMejorParaTi, onClick: () -> Unit) {
+private fun TarjetaMejorParaTi(sitio: SitioMejorParaTi, foto: String?, onClick: () -> Unit) {
     val c = sitio.candidato
     Column(
         modifier = Modifier
@@ -94,6 +95,14 @@ private fun TarjetaMejorParaTi(sitio: SitioMejorParaTi, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(12.dp),
     ) {
+        FotoComida(
+            url = foto,
+            emoji = c.emoji,
+            fondo = AppColors.tomatoLight,
+            esquinas = 12.dp,
+            descripcion = c.nombre,
+            modifier = Modifier.fillMaxWidth().height(84.dp).padding(bottom = 8.dp),
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(c.emoji, fontSize = 22.sp)
             Spacer(Modifier.weight(1f))

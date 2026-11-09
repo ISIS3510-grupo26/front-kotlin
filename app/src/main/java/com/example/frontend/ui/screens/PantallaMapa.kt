@@ -1,6 +1,18 @@
 package com.example.frontend.ui.screens
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import com.example.frontend.ui.acciones.mostrarAviso
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -80,14 +92,23 @@ fun PantallaMapa(
     alAbrirSitio: (spotId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val pines = remember(spots, tiemposEspera) { pinesDelMapa(spots, tiemposEspera) }
+    var busqueda by rememberSaveable { mutableStateOf("") }
+    var filtro by rememberSaveable { mutableStateOf(FiltroMapa.TODOS) }
+    // Se filtra el catalogo antes de armar los pines: la busqueda mira nombre, cocina y lugar.
+    val visibles = remember(spots, busqueda, filtro) {
+        val texto = busqueda.trim().lowercase()
+        spots.filter { s ->
+            filtro.cumple(s) && (texto.isEmpty() || "${s.name} ${s.subtitle}".lowercase().contains(texto))
+        }
+    }
+    val pines = remember(visibles, tiemposEspera) { pinesDelMapa(visibles, tiemposEspera) }
     // Se recuerda el id y no la posicion: si cambia el orden (otro perfil de gusto), sigue el mismo restaurante.
     var seleccionado by rememberSaveable { mutableStateOf<String?>(null) }
     val actual = pines.firstOrNull { it.spotId == seleccionado } ?: pines.firstOrNull()
 
     Column(modifier = modifier.fillMaxSize()) {
-        EncabezadoMapa()
-        BarraBusquedaMapa()
+        EncabezadoMapa(filtro = filtro, alElegirFiltro = { filtro = it })
+        BarraBusquedaMapa(texto = busqueda, alCambiar = { busqueda = it })
         AreaMapa(
             spots = pines,
             seleccionado = actual,
@@ -100,8 +121,17 @@ fun PantallaMapa(
     }
 }
 
+// Filtros del boton de la esquina. Usan los mismos datos que los chips del feed.
+enum class FiltroMapa(val etiqueta: String, val cumple: (Spot) -> Boolean) {
+    TODOS("All spots", { true }),
+    ECONOMICOS("Budget", { it.isBudget }),
+    VEGETARIANOS("Vegetarian", { it.isVegetarian }),
+    CERCA("≤ 5 min walk", { it.walkMinutes <= 5 }),
+}
+
 @Composable
-private fun EncabezadoMapa() {
+private fun EncabezadoMapa(filtro: FiltroMapa, alElegirFiltro: (FiltroMapa) -> Unit) {
+    var menuAbierto by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -115,19 +145,48 @@ private fun EncabezadoMapa() {
             fontWeight = FontWeight.ExtraBold,
             color = AppColors.espresso,
         )
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(AppColors.surface, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Tune, contentDescription = "Filtros", tint = AppColors.espresso)
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(if (filtro == FiltroMapa.TODOS) AppColors.surface else AppColors.tomatoLight, CircleShape)
+                    .clickable { menuAbierto = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Tune,
+                    contentDescription = "Filtros",
+                    tint = if (filtro == FiltroMapa.TODOS) AppColors.espresso else AppColors.tomato,
+                )
+            }
+            DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
+                FiltroMapa.entries.forEach { opcion ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                opcion.etiqueta,
+                                fontWeight = if (opcion == filtro) FontWeight.ExtraBold else FontWeight.Normal,
+                                color = if (opcion == filtro) AppColors.tomato else AppColors.espresso,
+                            )
+                        },
+                        onClick = {
+                            alElegirFiltro(opcion)
+                            menuAbierto = false
+                        },
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun BarraBusquedaMapa() {
+private fun BarraBusquedaMapa(texto: String, alCambiar: (String) -> Unit) {
+    val context = LocalContext.current
+    // Busqueda por voz con el reconocedor del sistema; lo que se dice queda escrito en la barra.
+    val dictar = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { resultado ->
+        resultado.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let(alCambiar)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,13 +199,44 @@ private fun BarraBusquedaMapa() {
     ) {
         Icon(Icons.Filled.Search, contentDescription = null, tint = AppColors.muted, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
-        Text(
-            "Search food stalls, trucks, campus spots...",
-            fontSize = 14.sp,
-            color = AppColors.muted,
+        BasicTextField(
+            value = texto,
+            onValueChange = alCambiar,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 14.sp, color = AppColors.espresso),
+            cursorBrush = SolidColor(AppColors.tomato),
             modifier = Modifier.weight(1f),
+            decorationBox = { campo ->
+                if (texto.isEmpty()) {
+                    Text("Search food stalls, trucks, campus spots...", fontSize = 14.sp, color = AppColors.muted)
+                }
+                campo()
+            },
         )
-        Icon(Icons.Filled.MicNone, contentDescription = "Búsqueda por voz", tint = AppColors.muted, modifier = Modifier.size(20.dp))
+        if (texto.isNotEmpty()) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = "Borrar búsqueda",
+                tint = AppColors.muted,
+                modifier = Modifier.size(20.dp).clickable { alCambiar("") },
+            )
+        } else {
+            Icon(
+                Icons.Filled.MicNone,
+                contentDescription = "Búsqueda por voz",
+                tint = AppColors.muted,
+                modifier = Modifier.size(20.dp).clickable {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        .putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a spot or a type of food")
+                    try {
+                        dictar.launch(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        mostrarAviso(context, "Voice search isn't available on this phone.")
+                    }
+                },
+            )
+        }
     }
 }
 

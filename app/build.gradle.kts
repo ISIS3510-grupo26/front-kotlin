@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     // Mapa real del campus con teselas de OpenStreetMap (no necesita API key).
     implementation(libs.osmdroid.android)
+    // Fotos de restaurantes y platos: Coil las descarga y las guarda en cache (memoria + disco).
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

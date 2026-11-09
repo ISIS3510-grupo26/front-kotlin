@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.model.FeedFilterType
 import com.example.frontend.model.Spot
 import com.example.frontend.model.TiempoEspera
+import com.example.frontend.data.sampleSpots
 import com.example.frontend.ui.EstadoPopularidad
+import java.text.Normalizer
 import com.example.frontend.ui.components.ChipPildora
 import com.example.frontend.ui.components.ListaSitios
 import com.example.frontend.ui.components.SeccionPopularidad
@@ -53,15 +55,20 @@ class FiltrosFeed(initial: Collection<FeedFilterType>) {
 
 // Busqueda por nombre, tipo de comida o ubicacion. Cuando hay texto, los chips no aplican:
 // el usuario esta buscando algo concreto, no filtrando el feed.
+// Sin tildes: "taqueria" encuentra "Taquería". Tambien mira los platos del menu (los del catalogo
+// empaquetado si el backend todavia no mando el detalle), asi "taco" encuentra la taqueria.
 fun buscarSitios(spots: List<Spot>, consulta: String): List<Spot> {
-    val q = consulta.trim()
+    val q = sinTildes(consulta.trim())
     if (q.isEmpty()) return spots
-    return spots.filter {
-        it.name.contains(q, ignoreCase = true) ||
-            it.cuisine.contains(q, ignoreCase = true) ||
-            it.location.contains(q, ignoreCase = true)
+    return spots.filter { spot ->
+        val menu = spot.menu.ifEmpty { sampleSpots.firstOrNull { it.id == spot.id }?.menu.orEmpty() }
+        val texto = sinTildes("${spot.name} ${spot.cuisine} ${spot.location} ${menu.joinToString(" ") { it.name }}")
+        texto.contains(q)
     }
 }
+
+private fun sinTildes(texto: String): String =
+    Normalizer.normalize(texto, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()
 
 @Composable
 fun PantallaParaTi(
