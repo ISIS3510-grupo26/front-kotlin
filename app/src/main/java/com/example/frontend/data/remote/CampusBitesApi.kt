@@ -82,6 +82,7 @@ object ApiClient {
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .addInterceptor(InterceptorConectividad)
         .addInterceptor(InterceptorSesion)
         .apply {
             if (BuildConfig.DEBUG) {

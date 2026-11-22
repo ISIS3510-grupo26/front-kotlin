@@ -3,6 +3,7 @@ package com.example.frontend
 import androidx.compose.ui.graphics.Color
 import com.example.frontend.data.coordenadaValida
 import com.example.frontend.data.pinesDelMapa
+import com.example.frontend.data.remote.esDireccionLocal
 import com.example.frontend.model.CandidatoMejorParaTi
 import com.example.frontend.model.FormulaMejorParaTi
 import com.example.frontend.model.Spot
@@ -78,7 +79,7 @@ class MejorParaTiTest {
     }
 
     @Test
-    fun pinesSalenDeLasCoordenadasYDescartanLasInvalidas() {
+    fun pinesUsanLasCoordenadasRealesYDescartanLasInvalidas() {
         val spots = listOf(
             spot("norte-oeste", lat = 4.6045, lng = -74.0670, afinidad = 70),
             spot("sur-este", lat = 4.5998, lng = -74.0646, afinidad = 90),
@@ -87,11 +88,20 @@ class MejorParaTiTest {
         )
         val pines = pinesDelMapa(spots, emptyMap())
         assertEquals(listOf("sur-este", "norte-oeste"), pines.map { it.spotId }) // el mas compatible es el #1
+        assertEquals(listOf(1, 2), pines.map { it.rank })
         val noroeste = pines.first { it.spotId == "norte-oeste" }
-        val sureste = pines.first { it.spotId == "sur-este" }
-        assertTrue(noroeste.dx < sureste.dx && noroeste.dy < sureste.dy) // norte arriba, oeste a la izquierda
-        assertTrue(pines.all { it.dx in 0.1f..0.9f && it.dy in 0.1f..0.65f })
+        assertEquals(4.6045, noroeste.lat, 1e-9)
+        assertEquals(-74.0670, noroeste.lng, 1e-9)
         assertFalse(coordenadaValida(91.0, 0.5))
+    }
+
+    @Test
+    fun soloSePidePermisoParaBackendsEnLaRedLocal() {
+        assertTrue(esDireccionLocal("http://10.0.2.2:8000/"))
+        assertTrue(esDireccionLocal("http://192.168.1.20:8000/"))
+        assertTrue(esDireccionLocal("http://172.20.0.5:8000/"))
+        assertFalse(esDireccionLocal("http://127.0.0.1:8000/"))
+        assertFalse(esDireccionLocal("https://campusbites.onrender.com/"))
     }
 
     private fun spot(id: String, lat: Double?, lng: Double?, afinidad: Int) = Spot(

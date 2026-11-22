@@ -36,6 +36,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.example.frontend.ui.acciones.abrirAjustesApp
+import com.example.frontend.ui.acciones.abrirAjustesNotificaciones
+import com.example.frontend.ui.acciones.mostrarAviso
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +81,7 @@ fun PantallaPerfil(
     alCerrarSesion: () -> Unit = {},
 ) {
     val unlocked = badges.count { it.unlocked }
+    val context = LocalContext.current
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -92,7 +97,7 @@ fun PantallaPerfil(
                     color = AppColors.espresso,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { }) {
+                IconButton(onClick = { abrirAjustesApp(context) }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = AppColors.espresso)
                 }
             }
@@ -101,7 +106,8 @@ fun PantallaPerfil(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 FotoPerfil()
                 Spacer(Modifier.size(14.dp))
-                Text("Julian Bierez", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.espresso)
+                // Sin sesion se ve "Guest"; con sesion, la parte del correo antes de la @.
+                Text(correoSesion?.substringBefore("@") ?: "Guest", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.espresso)
                 Text("Universidad de los Andes", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.muted)
             }
         }
@@ -154,6 +160,7 @@ fun PantallaPerfil(
                     iconColor = AppColors.tomato,
                     iconBackground = AppColors.tomatoLight,
                     title = "Dietary Preferences",
+                    alTocar = alEditarGusto,
                 )
                 FilaOpcion(
                     icon = Icons.Filled.CreditCard,
@@ -161,12 +168,14 @@ fun PantallaPerfil(
                     iconBackground = AppColors.mintLight,
                     title = "Campus Dining Card (UniCard)",
                     subtitle = "Connected • \$42.500 COP balance",
+                    alTocar = { mostrarAviso(context, "Top up your UniCard at any campus cashier.") },
                 )
                 FilaOpcion(
                     icon = Icons.Filled.NotificationsNone,
                     iconColor = AppColors.espresso,
                     iconBackground = AppColors.surface,
                     title = "Notifications",
+                    alTocar = { abrirAjustesNotificaciones(context) },
                 )
             }
         }
@@ -301,13 +310,14 @@ private fun FilaOpcion(
     iconBackground: Color,
     title: String,
     subtitle: String? = null,
+    alTocar: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(AppColors.card, RoundedCornerShape(18.dp))
             .border(1.dp, AppColors.border, RoundedCornerShape(18.dp))
-            .clickable { }
+            .clickable(onClick = alTocar)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

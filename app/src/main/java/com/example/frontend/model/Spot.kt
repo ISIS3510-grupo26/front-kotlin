@@ -22,6 +22,7 @@ data class MenuItem(
     val description: String,
     val price: String,
     val isStudentPick: Boolean = false,
+    val imageUrl: String? = null,
 )
 
 data class PeerReview(
@@ -62,6 +63,7 @@ data class Spot(
     val menu: List<MenuItem> = emptyList(),
     val reviews: List<PeerReview> = emptyList(),
     val totalReviews: Int = 0,
+    val imageUrl: String? = null,   // si es null (o no carga) se muestra el emoji
 ) {
     val cuisine: String get() = subtitle.split(" • ").first()
     val location: String get() = subtitle.split(" • ").last()

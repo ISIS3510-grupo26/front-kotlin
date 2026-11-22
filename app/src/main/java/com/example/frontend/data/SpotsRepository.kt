@@ -2,6 +2,7 @@ package com.example.frontend.data
 
 import android.util.LruCache
 import androidx.compose.ui.graphics.Color
+import com.example.frontend.BuildConfig
 import com.example.frontend.data.local.CatalogoDao
 import com.example.frontend.data.local.DetalleGuardadoEntidad
 import com.example.frontend.data.local.SitioGuardadoEntidad
@@ -84,6 +85,14 @@ class SpotsRepository(
     }
 }
 
+// El backend manda la foto relativa a su URL ("fotos/nitro-coffee.jpg") y la sirve el mismo: se completa
+// con API_BASE_URL, asi funciona igual en el emulador (10.0.2.2) y en el celular (IP del PC).
+private fun urlFoto(ruta: String?): String? = when {
+    ruta.isNullOrBlank() -> null
+    ruta.startsWith("http://") || ruta.startsWith("https://") -> ruta
+    else -> BuildConfig.API_BASE_URL + ruta.removePrefix("/")
+}
+
 private fun parseColor(hex: String): Color =
     Color(android.graphics.Color.parseColor(hex))
 
@@ -112,6 +121,7 @@ private fun SpotDto.toModel() = Spot(
     menu = menu.orEmpty().map { it.toModel() },
     reviews = reviews.orEmpty().map { it.toModel() },
     totalReviews = totalReviews,
+    imageUrl = urlFoto(imageUrl),
 )
 
 private fun MenuItemDto.toModel() = MenuItem(
@@ -121,6 +131,7 @@ private fun MenuItemDto.toModel() = MenuItem(
     description = description,
     price = price,
     isStudentPick = isStudentPick,
+    imageUrl = urlFoto(imageUrl),
 )
 
 private fun ReviewDto.toModel() = PeerReview(

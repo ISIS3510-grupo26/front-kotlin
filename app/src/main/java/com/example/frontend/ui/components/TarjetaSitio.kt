@@ -79,15 +79,13 @@ fun TarjetaSitio(
             }
             Spacer(Modifier.size(14.dp))
             Row(verticalAlignment = Alignment.Top) {
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .background(spot.emojiBackground, RoundedCornerShape(16.dp))
-                        .border(1.dp, spot.emojiBorder, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(spot.emoji, fontSize = 28.sp)
-                }
+                FotoComida(
+                    url = spot.imageUrl,
+                    emoji = spot.emoji,
+                    fondo = spot.emojiBackground,
+                    descripcion = spot.name,
+                    modifier = Modifier.size(64.dp).border(1.dp, spot.emojiBorder, RoundedCornerShape(16.dp)),
+                )
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

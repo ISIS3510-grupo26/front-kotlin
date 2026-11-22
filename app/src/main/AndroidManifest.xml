@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Para saber cuando el celular gana o pierde conexion (conectividad eventual). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Android 17: sin este permiso no se llega a un backend en la red local (10.0.2.2 del emulador o
+         la IP del PC). Se pide en tiempo de ejecucion solo si API_BASE_URL es local. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- BQ3: ubicacion del estudiante para recomendar restaurantes cercanos. Se pide en tiempo de ejecucion. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

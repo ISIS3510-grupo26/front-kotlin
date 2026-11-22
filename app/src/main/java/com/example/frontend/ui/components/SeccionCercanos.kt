@@ -46,6 +46,7 @@ fun SeccionCercanos(
     alAbrirSitio: (spotId: String) -> Unit,
     alReintentar: () -> Unit,
     modifier: Modifier = Modifier,
+    fotos: Map<String, String> = emptyMap(),   // spotId -> foto del restaurante (del catalogo)
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(bottom = 18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -92,7 +93,7 @@ fun SeccionCercanos(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(estado.lista, key = Recomendacion::id) { pick ->
-                        TarjetaCercano(pick, tiemposEspera[pick.id], onClick = { alAbrirSitio(pick.id) })
+                        TarjetaCercano(pick, tiemposEspera[pick.id], fotos[pick.id], onClick = { alAbrirSitio(pick.id) })
                     }
                 }
             }
@@ -101,7 +102,7 @@ fun SeccionCercanos(
 }
 
 @Composable
-private fun TarjetaCercano(pick: Recomendacion, tiempo: TiempoEspera?, onClick: () -> Unit) {
+private fun TarjetaCercano(pick: Recomendacion, tiempo: TiempoEspera?, foto: String?, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(150.dp)
@@ -110,6 +111,14 @@ private fun TarjetaCercano(pick: Recomendacion, tiempo: TiempoEspera?, onClick: 
             .clickable(onClick = onClick)
             .padding(12.dp),
     ) {
+        FotoComida(
+            url = foto,
+            emoji = pick.emoji,
+            fondo = AppColors.tomatoLight,
+            esquinas = 12.dp,
+            descripcion = pick.nombre,
+            modifier = Modifier.fillMaxWidth().height(80.dp).padding(bottom = 8.dp),
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(pick.emoji, fontSize = 22.sp)
             Spacer(Modifier.weight(1f))

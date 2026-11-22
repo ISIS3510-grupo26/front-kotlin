@@ -83,7 +83,7 @@ fun PantallaLogin(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
                     Icon(Icons.Filled.CloudOff, contentDescription = null, tint = AppColors.tomato, modifier = Modifier.size(16.dp))
                     Text(
-                        "  You're offline. Sign in when you reconnect; the rest of the app keeps working.",
+                        "  No internet connection. Sign in when you reconnect; the rest of the app keeps working.",
                         fontSize = 12.sp,
                         color = AppColors.tomato,
                     )

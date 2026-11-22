@@ -8,7 +8,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,16 +30,20 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.frontend.data.remote.PERMISO_RED_LOCAL
+import com.example.frontend.data.remote.necesitaPermisoRedLocal
 import com.example.frontend.ui.CampusBitesViewModel
 import com.example.frontend.ui.components.BarraInferior
 import com.example.frontend.ui.components.BottomTab
@@ -60,9 +74,46 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// La UI observa el estado del ViewModel (MVVM); los datos vienen del backend vía SpotsRepository.
+// Aviso general de "sin internet": va encima de TODAS las pantallas (login, detalle, reseña, popularidad
+// y las pestañas). Se suma a los mensajes de cada vista, que dicen que datos se estan mostrando sin red.
 @Composable
 fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
+    val sinInternet = !viewModel.hayConexion
+    Column(modifier = Modifier.fillMaxSize().background(AppColors.cream)) {
+        AnimatedVisibility(visible = sinInternet) {
+            BarraSinInternet()
+        }
+        // La barra ya ocupa el espacio de la barra de estado: las pantallas de abajo no lo vuelven a sumar.
+        val debajo = if (sinInternet) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
+        Box(modifier = Modifier.weight(1f).fillMaxWidth().then(debajo)) {
+            ContenidoPrincipal(viewModel)
+        }
+    }
+}
+
+@Composable
+private fun BarraSinInternet() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppColors.espresso)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.WifiOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        Text(
+            "  No internet connection. Showing what's saved on this phone.",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+    }
+}
+
+// La UI observa el estado del ViewModel (MVVM); los datos vienen del backend vía SpotsRepository.
+@Composable
+private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
     var currentTab by remember { mutableStateOf(BottomTab.FOR_YOU) }
     var editandoGusto by remember { mutableStateOf(false) }
     var escribiendoResena by remember { mutableStateOf(false) }
@@ -77,8 +128,19 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
         pedirUbicacion.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
 
+    // Android 17: sin este permiso las peticiones a un backend local (emulador o PC) se quedan colgadas.
+    val context = LocalContext.current
+    val pedirRedLocal = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
+        if (concedido) viewModel.alCambiarPermisoRedLocal()
+    }
+    LaunchedEffect(Unit) {
+        if (necesitaPermisoRedLocal(context)) pedirRedLocal.launch(PERMISO_RED_LOCAL)
+    }
+
     val spots = viewModel.spots
     val detalle = viewModel.detalle
+    // Fotos por id para las secciones que solo traen el id del restaurante (BQ6 y BQ3).
+    val fotos = remember(spots) { spots.mapNotNull { s -> s.imageUrl?.let { s.id to it } }.toMap() }
 
     // Abrir por id sirve tanto para las tarjetas del feed como para el ranking "Popular right now".
     val abrirPorId: (String) -> Unit = { id -> viewModel.buscarSitio(id)?.let(viewModel::abrirSitio) }
@@ -165,6 +227,9 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
         return
     }
 
+    // Atras desde Map, Saved o Profile vuelve a For You en vez de cerrar la app.
+    BackHandler(enabled = currentTab != BottomTab.FOR_YOU) { currentTab = BottomTab.FOR_YOU }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = { BarraInferior(current = currentTab, alElegir = { currentTab = it }) },
@@ -203,6 +268,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                             estado = viewModel.mejorParaTi,
                             alAbrirSitio = abrirPorId,
                             alEditarGusto = { editandoGusto = true },
+                            fotos = fotos,
                         )
                     },
                     seccionCercanos = {
@@ -214,6 +280,7 @@ fun PantallaPrincipal(viewModel: CampusBitesViewModel = viewModel()) {
                             alPedirUbicacion = solicitarPermisoUbicacion,
                             alAbrirSitio = abrirPorId,
                             alReintentar = { viewModel.cargarRecomendaciones(forzar = true) },
+                            fotos = fotos,
                         )
                     },
                 )
