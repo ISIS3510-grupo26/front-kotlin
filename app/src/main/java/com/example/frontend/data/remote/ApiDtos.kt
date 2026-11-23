@@ -68,6 +68,9 @@ data class PageLoadEventDto(
     val appVersion: String,
     val sessionId: String,
     val occurredAt: String,
+    // BQ7 cuenta usuarios distintos que guardan favoritos, asi que favorite_added va con el usuario.
+    // Los demas eventos lo dejan en null y Gson no lo manda.
+    val userId: String? = null,
 )
 
 data class PageLoadBatchDto(val events: List<PageLoadEventDto>)
@@ -223,4 +226,15 @@ data class NearbyPickDto(
     val longitude: Double,
     val distanceMeters: Int,
     val walkMinutes: Double,
+)
+
+// ---------- BQ5 (backend de Camilo): favoritos abiertos ahora y a <= 15 min caminando ----------
+
+data class NearbyFavoriteDto(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val distanceMeters: Int,
+    val walkMinutes: Double,
+    val closesAt: String,       // 'HH:MM' hora local en que cierra la franja abierta actual
 )

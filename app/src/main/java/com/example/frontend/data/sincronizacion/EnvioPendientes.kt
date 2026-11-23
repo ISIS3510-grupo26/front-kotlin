@@ -1,5 +1,6 @@
 package com.example.frontend.data.sincronizacion
 
+import com.example.frontend.data.FavoritosRepository
 import com.example.frontend.data.aIso8601
 import com.example.frontend.data.local.PendientesDao
 import com.example.frontend.data.local.ResenasPendientesDao
@@ -31,6 +32,9 @@ class SincronizadorPendientes(
     // Las reseñas exigen sesion. Con la app cerrada WorkManager arranca sin ViewModel y TokenActual esta
     // vacio, asi que el token se lee de DataStore (AlmacenSesion) antes de enviarlas.
     private val tokenGuardado: suspend () -> String? = { null },
+    // Sprint 4: cola de favoritos (BQ5 y BQ7). Necesita saber de que usuario es la sesion guardada.
+    private val favoritos: FavoritosRepository? = null,
+    private val usuarioGuardado: suspend () -> String? = { null },
 ) {
     private val gson = Gson()
     // Si la app y WorkManager arrancan a la vez, el segundo espera: asi no se envia el mismo lote dos veces.
@@ -40,14 +44,21 @@ class SincronizadorPendientes(
     private val _ultimaSincronizacion = MutableStateFlow(0L)
     val ultimaSincronizacion: StateFlow<Long> = _ultimaSincronizacion.asStateFlow()
 
-    // Corrutinas anidadas en I/O: eventos, reportes y reseñas van a endpoints distintos y no dependen
-    // uno del otro, asi que se envian en paralelo (tres async dentro de esta corrutina) y se esperan todos.
+    // Corrutinas anidadas en I/O: favoritos, reportes y reseñas van a endpoints distintos y no dependen
+    // uno del otro, asi que se envian en paralelo (async dentro de esta corrutina) y se esperan todos.
+    // Los eventos si dependen de los favoritos: cada favorito que llega al servidor deja un evento
+    // favorite_added (BQ7) en la cola, asi que la corrutina de eventos espera a la de favoritos (await)
+    // y ese evento sale en este mismo envio en vez de esperar al siguiente.
     suspend fun enviarTodo(): Boolean = lock.withLock {
         val todoEnviado = coroutineScope {
-            val eventos = async(Dispatchers.IO) { enviarEventos() }
+            val favoritosEnviados = async(Dispatchers.IO) { enviarFavoritos() }
             val reportes = async(Dispatchers.IO) { enviarReportesEspera() }
             val resenasEnviadas = async(Dispatchers.IO) { enviarResenas() }
-            eventos.await() and reportes.await() and resenasEnviadas.await()
+            val eventos = async(Dispatchers.IO) {
+                favoritosEnviados.await()
+                enviarEventos()
+            }
+            eventos.await() and reportes.await() and resenasEnviadas.await() and favoritosEnviados.await()
         }
         if (todoEnviado) _ultimaSincronizacion.value = System.currentTimeMillis()
         todoEnviado
@@ -97,6 +108,15 @@ class SincronizadorPendientes(
             }
         }
         return todoEnviado
+    }
+
+    // Igual que las reseñas: sin sesion no hay a nombre de quien guardarlos, y no cuenta como fallo.
+    private suspend fun enviarFavoritos(): Boolean {
+        val repositorio = favoritos ?: return true
+        val userId = usuarioGuardado() ?: return true
+        if (TokenActual.valor == null) TokenActual.valor = tokenGuardado()
+        if (TokenActual.valor == null) return true
+        return repositorio.enviarPendientes(userId)
     }
 
     private suspend fun enviarResenas(): Boolean {

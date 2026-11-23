@@ -11,6 +11,7 @@ import com.example.frontend.data.remote.TokenActual
 import com.example.frontend.data.sesion.AlmacenSesion
 import com.example.frontend.data.sincronizacion.SincronizadorPendientes
 import com.example.frontend.data.sincronizacion.TrabajoSincronizacion
+import com.example.frontend.data.telemetry.TelemetriaCargas
 import com.example.frontend.data.ubicacion.ProveedorUbicacion
 import com.example.frontend.data.ubicacion.UbicacionGps
 import java.io.File
@@ -32,6 +33,8 @@ object Dependencias {
         private set
     lateinit var almacenGusto: AlmacenGusto
         private set
+    lateinit var favoritos: FavoritosRepository
+        private set
     lateinit var proveedorUbicacion: ProveedorUbicacion
         private set
     lateinit var carpetaArchivos: File
@@ -52,11 +55,20 @@ object Dependencias {
         InterceptorConectividad.alResponder = monitorConectividad::avisarRespuesta
         almacenSesion = AlmacenSesion(appContext)
         almacenGusto = AlmacenGusto(appContext)
+        favoritos = FavoritosRepository(
+            api,
+            baseDatos.favoritosDao(),
+            almacenGusto,
+            telemetria = TelemetriaCargas(baseDatos.pendientesDao()),
+            alEncolar = ::programarSincronizacion,
+        )
         sincronizador = SincronizadorPendientes(
             api,
             baseDatos.pendientesDao(),
             baseDatos.resenasPendientesDao(),
             tokenGuardado = { almacenSesion.actual()?.takeIf { !it.vencida() }?.token },
+            favoritos = favoritos,
+            usuarioGuardado = { almacenSesion.actual()?.takeIf { !it.vencida() }?.userId },
         )
         proveedorUbicacion = ProveedorUbicacion(UbicacionGps(appContext))
         carpetaArchivos = appContext.filesDir

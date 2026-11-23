@@ -1,6 +1,16 @@
 package com.example.frontend.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +44,7 @@ fun PantallaGuardados(
     alAbrirSitio: (Spot) -> Unit,
     modifier: Modifier = Modifier,
     tiemposEspera: Map<String, TiempoEspera> = emptyMap(),
+    alVerAbiertosCerca: () -> Unit = {},
 ) {
     var selected by rememberSaveable { mutableStateOf<SpotCategory?>(null) }
 
@@ -48,6 +59,7 @@ fun PantallaGuardados(
             selected = selected,
             alElegir = { selected = it },
         )
+        if (favorites.isNotEmpty()) BotonAbiertosCerca(alVerAbiertosCerca)
         ListaSitios(
             spots = visible,
             mensajeVacio = "No saved places in this category yet.",
@@ -93,5 +105,27 @@ private fun EncabezadoGuardados(
                 )
             }
         }
+    }
+}
+
+// Sprint 4: entrada a "Open near you" (BQ5). En Flutter es el filtro "Open • ≤15 min" de esta misma pantalla.
+@Composable
+private fun BotonAbiertosCerca(alTocar: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp)
+            .background(AppColors.mintLight, RoundedCornerShape(16.dp))
+            .border(1.dp, AppColors.mint.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+            .clickable(onClick = alTocar)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("🕒", fontSize = 22.sp)
+        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+            Text("Open near you", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = AppColors.espresso)
+            Text("Which of these are open now, within a 15 min walk", fontSize = 12.sp, color = AppColors.muted)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = AppColors.mint)
     }
 }

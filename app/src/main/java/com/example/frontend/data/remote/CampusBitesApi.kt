@@ -7,9 +7,12 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -69,6 +72,27 @@ interface CampusBitesApi {
         @Query("maxWalkMinutes") maxWalkMinutes: Int = 15,
         @Query("limit") limit: Int = 5,
     ): List<NearbyPickDto>
+
+    // Favoritos del usuario en el backend (los mismos que ve la app Flutter). PUT y DELETE responden 204
+    // aunque el favorito ya estuviera (o ya no estuviera): repetir un envio no hace dano.
+    @GET("api/v1/users/{userId}/favorites")
+    suspend fun favoritos(@Path("userId") userId: String): List<SpotDto>
+
+    @PUT("api/v1/users/{userId}/favorites/{spotId}")
+    suspend fun guardarFavorito(@Path("userId") userId: String, @Path("spotId") spotId: String): Response<Unit>
+
+    @DELETE("api/v1/users/{userId}/favorites/{spotId}")
+    suspend fun quitarFavorito(@Path("userId") userId: String, @Path("spotId") spotId: String): Response<Unit>
+
+    // BQ5 (tipo 2): favoritos abiertos ahora y a <= maxWalkMinutes caminando desde (lat, lng).
+    @GET("api/v1/users/{userId}/favorites/nearby")
+    suspend fun favoritosAbiertosCerca(
+        @Path("userId") userId: String,
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("maxWalkMinutes") maxWalkMinutes: Int,
+        @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
+    ): List<NearbyFavoriteDto>
 
     @GET("api/v1/analytics/searches-by-weekday")
     suspend fun busquedasPorDia(

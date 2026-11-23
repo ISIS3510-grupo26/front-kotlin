@@ -52,6 +52,7 @@ import com.example.frontend.ui.components.SeccionMejorParaTi
 import com.example.frontend.ui.screens.PantallaDetalle
 import com.example.frontend.ui.screens.PantallaLogin
 import com.example.frontend.ui.screens.PantallaEscribirResena
+import com.example.frontend.ui.screens.PantallaAbiertosCerca
 import com.example.frontend.ui.screens.PantallaGuardados
 import com.example.frontend.ui.screens.PantallaMapa
 import com.example.frontend.ui.screens.PantallaParaTi
@@ -119,6 +120,7 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
     var escribiendoResena by remember { mutableStateOf(false) }
     var viendoPopularidad by remember { mutableStateOf(false) }
     var mostrandoLogin by remember { mutableStateOf(false) }
+    var viendoAbiertosCerca by remember { mutableStateOf(false) }
 
     // Permiso de ubicacion para BQ3. Si lo niega, la app sigue con la ubicacion del campus (Strategy).
     val pedirUbicacion = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -213,6 +215,24 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
         )
         return
     }
+    if (viendoAbiertosCerca) {
+        BackHandler { viendoAbiertosCerca = false }
+        PantallaAbiertosCerca(
+            conSesion = viewModel.sesion != null,
+            estado = viewModel.abiertosCerca,
+            pendientesPorSincronizar = viewModel.favoritosPendientes,
+            hayConexion = viewModel.hayConexion,
+            fotos = fotos,
+            alCargar = viewModel::cargarAbiertosCerca,
+            alAbrirSitio = abrirPorId,
+            alQuitarFavorito = viewModel::marcarGuardado,
+            alIniciarSesion = { mostrandoLogin = true },
+            alPedirUbicacion = solicitarPermisoUbicacion,
+            alVolver = { viendoAbiertosCerca = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
     if (viendoPopularidad) {
         BackHandler { viendoPopularidad = false }
         PantallaPopularidad(
@@ -297,6 +317,7 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
                     alAbrirSitio = viewModel::abrirSitio,
                     modifier = contentModifier,
                     tiemposEspera = viewModel.tiemposEspera,
+                    alVerAbiertosCerca = { viendoAbiertosCerca = true },
                 )
                 BottomTab.PROFILE -> PantallaPerfil(
                     savedCount = spots.count { it.isSaved },

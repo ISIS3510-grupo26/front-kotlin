@@ -34,21 +34,13 @@ class TelemetriaCargas(
     // Vista de pagina de restaurante (BQ1, BQ2 y BQ3): cuanto tardo y si fallo.
     fun registrar(spotId: String, durationMs: Long, error: Throwable?) {
         encolar(
-            PageLoadEventDto(
-                eventId = UUID.randomUUID().toString(),
+            evento(
                 screen = SCREEN_RESTAURANT_DETAIL,
                 spotId = spotId,
                 durationMs = durationMs,
                 success = error == null,
                 httpStatus = if (error == null) 200 else (error as? HttpException)?.code(),
                 errorType = error?.let(::clasificarError),
-                deviceModel = modeloDispositivo(),
-                osName = "Android",
-                osVersion = Build.VERSION.RELEASE,
-                platform = "android-kotlin",
-                appVersion = BuildConfig.VERSION_NAME,
-                sessionId = sessionId,
-                occurredAt = aIso8601(),
             )
         )
     }
@@ -56,25 +48,45 @@ class TelemetriaCargas(
     // Busqueda (BQ3): el usuario escribio en el buscador y eligio este restaurante.
     // Usa el mismo contrato y la misma cola; el backend lo distingue por screen = "search".
     fun registrarBusqueda(spotId: String) {
-        encolar(
-            PageLoadEventDto(
-                eventId = UUID.randomUUID().toString(),
-                screen = SCREEN_SEARCH,
-                spotId = spotId,
-                durationMs = 0,
-                success = true,
-                httpStatus = null,
-                errorType = null,
-                deviceModel = modeloDispositivo(),
-                osName = "Android",
-                osVersion = Build.VERSION.RELEASE,
-                platform = "android-kotlin",
-                appVersion = BuildConfig.VERSION_NAME,
-                sessionId = sessionId,
-                occurredAt = aIso8601(),
-            )
-        )
+        encolar(evento(screen = SCREEN_SEARCH, spotId = spotId))
     }
+
+    // BQ7: el estudiante guardo un restaurante y el backend ya lo tiene. Lo llama el sincronizador justo
+    // despues del PUT, por eso es suspend y escribe directo en Room (sin lanzar otra corrutina): asi el
+    // evento ya esta en la cola cuando, en ese mismo envio, se mandan los eventos. El eventId y la hora
+    // son los del toque, guardados en la cola de favoritos: si el PUT se repite, el backend no lo cuenta doble.
+    suspend fun registrarFavoritoGuardado(userId: String, spotId: String, eventId: String, tocadoEn: Long) {
+        val dto = evento(screen = SCREEN_FAVORITE_ADDED, spotId = spotId, eventId = eventId, ocurrioEn = tocadoEn, userId = userId)
+        pendientes.encolarEvento(EventoPendienteEntidad(dto.eventId, gson.toJson(dto), System.currentTimeMillis()))
+    }
+
+    private fun evento(
+        screen: String,
+        spotId: String,
+        durationMs: Long = 0,
+        success: Boolean = true,
+        httpStatus: Int? = null,
+        errorType: String? = null,
+        eventId: String = UUID.randomUUID().toString(),
+        ocurrioEn: Long = System.currentTimeMillis(),
+        userId: String? = null,
+    ) = PageLoadEventDto(
+        eventId = eventId,
+        screen = screen,
+        spotId = spotId,
+        durationMs = durationMs,
+        success = success,
+        httpStatus = httpStatus,
+        errorType = errorType,
+        deviceModel = modeloDispositivo(),
+        osName = "Android",
+        osVersion = Build.VERSION.RELEASE,
+        platform = "android-kotlin",
+        appVersion = BuildConfig.VERSION_NAME,
+        sessionId = sessionId,
+        occurredAt = aIso8601(ocurrioEn),
+        userId = userId,
+    )
 
     // Antes la cola vivia en memoria y se perdia al cerrar la app. Ahora se escribe en disco (Room)
     // en un hilo de IO y WorkManager la envia apenas haya conexion, aunque la app ya este cerrada.
@@ -89,6 +101,7 @@ class TelemetriaCargas(
     private companion object {
         const val SCREEN_RESTAURANT_DETAIL = "restaurant_detail"
         const val SCREEN_SEARCH = "search"
+        const val SCREEN_FAVORITE_ADDED = "favorite_added"
         const val MAX_PENDIENTES = 2000
 
         fun clasificarError(e: Throwable): String = when (e) {

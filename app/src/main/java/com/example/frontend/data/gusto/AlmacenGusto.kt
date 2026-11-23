@@ -3,6 +3,7 @@ package com.example.frontend.data.gusto
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,6 +27,9 @@ class AlmacenGusto(private val context: Context) {
         val cocinas = stringSetPreferencesKey("cocinas")
         val picante = stringPreferencesKey("picante")
         val favoritos = stringSetPreferencesKey("favoritos")
+        val usuariosConFavoritosSubidos = stringSetPreferencesKey("usuarios_con_favoritos_subidos")
+        val abiertosUsuario = stringPreferencesKey("abiertos_usuario")
+        val abiertosGuardadoEn = longPreferencesKey("abiertos_guardado_en")
     }
 
     // Lo que no se ha guardado nunca sale con los valores por defecto de TasteProfile.
@@ -49,6 +53,39 @@ class AlmacenGusto(private val context: Context) {
 
     suspend fun guardarFavoritos(ids: Set<String>) {
         context.datosGusto.edit { it[Claves.favoritos] = ids }
+    }
+
+    suspend fun favoritosActuales(): Set<String>? = favoritos.first()
+
+    // Sprint 4: los favoritos tambien viven en la cuenta. La primera vez que un usuario entra en este
+    // celular se suben los que ya tenia guardados aqui; despues manda el servidor. Es un solo dato por
+    // usuario (si ya se hizo o no), por eso va en DataStore y no en una tabla.
+    suspend fun yaSubioFavoritos(userId: String): Boolean =
+        userId in (context.datosGusto.data.first()[Claves.usuariosConFavoritosSubidos] ?: emptySet())
+
+    suspend fun marcarFavoritosSubidos(userId: String) {
+        context.datosGusto.edit { it[Claves.usuariosConFavoritosSubidos] = (it[Claves.usuariosConFavoritosSubidos] ?: emptySet()) + userId }
+    }
+
+    // BQ5: cuando llego la ultima respuesta buena de "Open near you". Se guarda aparte de la tabla porque
+    // una respuesta vacia ("ninguno abierto") tambien cuenta y no deja filas en Room.
+    suspend fun momentoAbiertos(userId: String): Long? {
+        val datos = context.datosGusto.data.first()
+        return datos[Claves.abiertosGuardadoEn]?.takeIf { datos[Claves.abiertosUsuario] == userId }
+    }
+
+    suspend fun guardarMomentoAbiertos(userId: String, millis: Long) {
+        context.datosGusto.edit {
+            it[Claves.abiertosUsuario] = userId
+            it[Claves.abiertosGuardadoEn] = millis
+        }
+    }
+
+    suspend fun olvidarMomentoAbiertos() {
+        context.datosGusto.edit {
+            it.remove(Claves.abiertosUsuario)
+            it.remove(Claves.abiertosGuardadoEn)
+        }
     }
 
     private fun Preferences.aPerfil(): TasteProfile {
