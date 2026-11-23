@@ -94,6 +94,15 @@ interface CampusBitesApi {
         @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
     ): List<NearbyFavoriteDto>
 
+    // BQ8 (tipo 2): espera promedio por hora en cada restaurante. minReports = 2: una hora con un solo reporte
+    // se muestra pero no se recomienda.
+    @GET("api/v1/analytics/best-time-to-go")
+    suspend fun mejorHoraParaIr(
+        @Query("days") days: Int,
+        @Query("tzOffsetMinutes") tzOffsetMinutes: Int,
+        @Query("minReports") minReports: Int = 2,
+    ): BestTimeToGoDto
+
     @GET("api/v1/analytics/searches-by-weekday")
     suspend fun busquedasPorDia(
         @Query("tzOffsetMinutes") tzOffsetMinutes: Int,

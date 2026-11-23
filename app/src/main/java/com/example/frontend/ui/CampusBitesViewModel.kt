@@ -51,6 +51,11 @@ import com.example.frontend.model.TasteProfile
 import com.example.frontend.model.rankearMejorParaTi
 import com.example.frontend.model.armarSpotsParaUi
 import com.example.frontend.data.AbiertosCercaRepository
+import com.example.frontend.data.MejorHoraRepository
+import com.example.frontend.data.contexto.ContextoHorario
+import com.example.frontend.data.OrigenMejorHora
+import com.example.frontend.model.ReglasMejorHora
+import com.example.frontend.model.ResumenMejorHora
 import com.example.frontend.data.FavoritosRepository
 import com.example.frontend.data.OrigenAbiertos
 import com.example.frontend.model.AbiertoCerca
@@ -98,6 +103,16 @@ data class EstadoAbiertosCerca(
     val origen: OrigenAbiertos? = null,
 )
 
+// BQ8 "Best time to go" (Sprint 4, Tomas): la hora con menos espera en cada restaurante.
+data class EstadoMejorHora(
+    val ventanaDias: Int = 28,           // pestañas de la pantalla: 7 o 28 dias
+    val resumen: ResumenMejorHora? = null,
+    val cargando: Boolean = false,
+    val error: String? = null,
+    val aviso: String? = null,           // p. ej. "Offline · best times saved 2 h ago"
+    val origen: OrigenMejorHora? = null,
+)
+
 // Estado de la feature "Popular right now" (respuesta de la BQ3 para la hora actual del celular).
 data class EstadoPopularidad(
     val ahora: RankingHora? = null,
@@ -123,6 +138,8 @@ class CampusBitesViewModel(
     private val favoritosRepository: FavoritosRepository = Dependencias.favoritos,
     private val abiertosRepository: AbiertosCercaRepository =
         AbiertosCercaRepository(ApiClient.api, Dependencias.baseDatos.favoritosDao(), Dependencias.almacenGusto),
+    private val mejorHoraRepository: MejorHoraRepository =
+        MejorHoraRepository(ApiClient.api, Dependencias.baseDatos.esperasPorHoraDao()),
 ) : ViewModel() {
 
     // Los guardados viven en DataStore (sobreviven a cerrar la app). Mientras se leen, y si el estudiante
@@ -191,6 +208,10 @@ class CampusBitesViewModel(
 
     var abiertosCerca by mutableStateOf(EstadoAbiertosCerca())
         private set
+
+    var mejorHora by mutableStateOf(EstadoMejorHora())
+        private set
+    private var mejorHoraJob: Job? = null
 
     // Cambios de favoritos que todavia no llegan al servidor (Room). La pantalla dice "N waiting to sync".
     var favoritosPendientes by mutableStateOf(0)
@@ -359,6 +380,7 @@ class CampusBitesViewModel(
             sincronizarFavoritos()
             if (abiertosCerca.origen == OrigenAbiertos.COPIA_LOCAL || abiertosCerca.error != null) cargarAbiertosCerca(forzar = true)
         }
+        if (mejorHora.origen == OrigenMejorHora.COPIA_LOCAL || mejorHora.error != null) cargarMejorHora(forzar = true)
         Dependencias.programarSincronizacion()
     }
 
@@ -699,7 +721,39 @@ class CampusBitesViewModel(
         }
     }
 
+    // ---------- BQ8: Best time to go (Sprint 4, Tomas) ----------
+
+    // Multi-threading: arranca en Main (viewModelScope). El repositorio pide la red y lee la copia de Room
+    // en paralelo, en IO. Con las filas listas, armar el resumen (agrupar por restaurante, mejor y peor hora,
+    // proxima hora tranquila desde ahora) es CPU y va en Default. La asignacion del estado vuelve a Main.
+    fun cargarMejorHora(ventanaDias: Int = mejorHora.ventanaDias, forzar: Boolean = false) {
+        mejorHoraJob?.cancel()
+        mejorHora = mejorHora.copy(ventanaDias = ventanaDias, cargando = true, error = null)
+        val horaActual = ContextoHorario.Dispositivo.horaLocal()
+        mejorHoraJob = viewModelScope.launch {
+            mejorHora = try {
+                val resultado = mejorHoraRepository.cargar(ventanaDias, forzar)
+                val resumen = withContext(Dispatchers.Default) { ReglasMejorHora.armar(resultado.filas, horaActual) }
+                val hace = textoHaceCuanto(((System.currentTimeMillis() - resultado.guardadoEn) / 60_000L).toInt())
+                val aviso = when {
+                    resultado.origen == OrigenMejorHora.COPIA_LOCAL -> "Offline · best times saved $hace. New reports will show when you reconnect."
+                    resultado.origen == OrigenMejorHora.MEMORIA && !hayConexion -> "Offline · checked $hace"
+                    else -> null
+                }
+                EstadoMejorHora(ventanaDias, resumen, aviso = aviso, origen = resultado.origen)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                EstadoMejorHora(
+                    ventanaDias,
+                    error = if (e is IOException) MENSAJE_MEJOR_HORA_OFFLINE else "Couldn't load the best times. Try again.",
+                )
+            }
+        }
+    }
+
     private companion object {
+        const val MENSAJE_MEJOR_HORA_OFFLINE = "You're offline and this phone has no saved best times for this period yet. They'll load when you reconnect."
         const val MENSAJE_ABIERTOS_OFFLINE = "You're offline and this phone has no saved opening hours yet. They'll load when you reconnect."
         const val MENSAJE_LOGIN_OFFLINE = "You're offline. Signing in needs a connection; you can keep browsing meanwhile."
         const val MENSAJE_PICKS_OFFLINE = "You're offline. Picks near you will load when you reconnect."

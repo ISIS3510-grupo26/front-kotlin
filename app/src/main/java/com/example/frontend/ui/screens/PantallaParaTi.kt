@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.example.frontend.model.FeedFilterType
 import com.example.frontend.model.Spot
 import com.example.frontend.model.TiempoEspera
+import com.example.frontend.data.medir
 import com.example.frontend.data.sampleSpots
 import com.example.frontend.ui.EstadoPopularidad
 import java.text.Normalizer
@@ -53,22 +54,53 @@ class FiltrosFeed(initial: Collection<FeedFilterType>) {
     fun filtrar(spots: List<Spot>) = spots.filter { spot -> active.all(spot::cumpleFiltro) }
 }
 
-// Busqueda por nombre, tipo de comida o ubicacion. Cuando hay texto, los chips no aplican:
-// el usuario esta buscando algo concreto, no filtrando el feed.
-// Sin tildes: "taqueria" encuentra "Taquería". Tambien mira los platos del menu (los del catalogo
-// empaquetado si el backend todavia no mando el detalle), asi "taco" encuentra la taqueria.
-fun buscarSitios(spots: List<Spot>, consulta: String): List<Spot> {
-    val q = sinTildes(consulta.trim())
-    if (q.isEmpty()) return spots
-    return spots.filter { spot ->
-        val menu = spot.menu.ifEmpty { sampleSpots.firstOrNull { it.id == spot.id }?.menu.orEmpty() }
-        val texto = sinTildes("${spot.name} ${spot.cuisine} ${spot.location} ${menu.joinToString(" ") { it.name }}")
-        texto.contains(q)
+// Busqueda por nombre, tipo de comida, ubicacion y platos del menu. Cuando hay texto, los chips no aplican:
+// el usuario esta buscando algo concreto, no filtrando el feed. Sin tildes: "taqueria" encuentra "Taquería",
+// y "taco" encuentra la taqueria por su menu (el del catalogo empaquetado si el backend no mando el detalle).
+//
+// Micro-optimizacion (Sprint 4, Tomas). Antes, por CADA letra escrita y por CADA restaurante, se:
+//  - compilaba un Regex nuevo (Regex("\\p{Mn}+") dentro de sinTildes),
+//  - buscaba el menu con un recorrido lineal de sampleSpots (firstOrNull),
+//  - armaba el texto con plantillas y joinToString y lo normalizaba (Normalizer + replace + lowercase).
+// Como la funcion se llamaba directo en la composicion, todo eso tambien corria en cada recomposicion del
+// feed (llega un tiempo de espera, cambia la red...), aunque la consulta no hubiera cambiado.
+// Ahora:
+//  - el Regex se compila una sola vez (constante),
+//  - el texto normalizado de cada restaurante se arma una vez por catalogo (IndiceBusqueda, con remember),
+//  - los menus del catalogo empaquetado se leen de un HashMap por id (O(1)) y no con firstOrNull (O(n)),
+//  - por letra solo se normaliza la consulta y se hace un contains por restaurante, con un for por indice,
+//  - y el resultado se recuerda por (indice, consulta): una recomposicion sin cambios no vuelve a buscar.
+private val MARCAS_DE_TILDE = Regex("\\p{Mn}+")
+private val menusEmpaquetados: Map<String, List<String>> by lazy {
+    HashMap<String, List<String>>(sampleSpots.size * 2).apply {
+        for (spot in sampleSpots) put(spot.id, spot.menu.map { it.name })
     }
 }
 
 private fun sinTildes(texto: String): String =
-    Normalizer.normalize(texto, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()
+    MARCAS_DE_TILDE.replace(Normalizer.normalize(texto, Normalizer.Form.NFD), "").lowercase()
+
+class IndiceBusqueda(private val spots: List<Spot>) {
+    private val textos: Array<String> = medir("indexarBusqueda") {
+        Array(spots.size) { i ->
+            val spot = spots[i]
+            val texto = StringBuilder(128).append(spot.name).append(' ').append(spot.cuisine).append(' ').append(spot.location)
+            val menu = if (spot.menu.isNotEmpty()) spot.menu.map { it.name } else menusEmpaquetados[spot.id].orEmpty()
+            for (plato in menu) texto.append(' ').append(plato)
+            sinTildes(texto.toString())
+        }
+    }
+
+    fun buscar(consulta: String): List<Spot> = medir("buscarSitios") {
+        val q = sinTildes(consulta.trim())
+        if (q.isEmpty()) return@medir spots
+        val resultado = ArrayList<Spot>()
+        for (i in textos.indices) if (textos[i].contains(q)) resultado.add(spots[i])
+        resultado
+    }
+}
+
+fun buscarSitios(spots: List<Spot>, consulta: String): List<Spot> = IndiceBusqueda(spots).buscar(consulta)
 
 @Composable
 fun PantallaParaTi(
@@ -87,12 +119,15 @@ fun PantallaParaTi(
     val filters = remember { FiltrosFeed(listOf(FeedFilterType.IN_A_RUSH)) }
     var consulta by rememberSaveable { mutableStateOf("") }
     val buscando = consulta.isNotBlank()
+    // El indice se arma una vez por catalogo y el resultado se recalcula solo si cambia la consulta.
+    val indice = remember(spots) { IndiceBusqueda(spots) }
+    val resultados = remember(indice, consulta) { if (buscando) indice.buscar(consulta) else emptyList() }
 
     Column(modifier = modifier.fillMaxSize()) {
         EncabezadoParaTi(filters = filters, consulta = consulta, alCambiarConsulta = { consulta = it })
         if (buscando) {
             ListaSitios(
-                spots = buscarSitios(spots, consulta),
+                spots = resultados,
                 mensajeVacio = "No spots match \"${consulta.trim()}\".",
                 alMarcarGuardado = alMarcarGuardado,
                 // Abrir desde resultados de busqueda cuenta como "busqueda" para la BQ3.
