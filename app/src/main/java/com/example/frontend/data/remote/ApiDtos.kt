@@ -9,6 +9,7 @@ data class MenuItemDto(
     val description: String,
     val price: String,
     val isStudentPick: Boolean,
+    val imageUrl: String? = null,
 )
 
 data class ReviewDto(
@@ -41,6 +42,12 @@ data class SpotDto(
     val note: String,
     val uniCardPerk: String?,
     val totalReviews: Int,
+    // Coordenadas para el mapa. Las copias de Room guardadas antes de que el backend las mandara no las
+    // traen; Gson deja null y el mapa usa las del catalogo empaquetado.
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    // Foto del restaurante. Una copia de Room anterior a las fotos no la trae: queda null y se ve el emoji.
+    val imageUrl: String? = null,
     // Solo vienen en GET /spots/{id}.
     val menu: List<MenuItemDto>? = null,
     val reviews: List<ReviewDto>? = null,
@@ -61,6 +68,9 @@ data class PageLoadEventDto(
     val appVersion: String,
     val sessionId: String,
     val occurredAt: String,
+    // BQ7 cuenta usuarios distintos que guardan favoritos, asi que favorite_added va con el usuario.
+    // Los demas eventos lo dejan en null y Gson no lo manda.
+    val userId: String? = null,
 )
 
 data class PageLoadBatchDto(val events: List<PageLoadEventDto>)
@@ -140,6 +150,50 @@ data class LastWaitTimesDto(
     val spots: List<LastWaitTimeDto>,
 )
 
+// ---------- Reseñas del usuario (POST /spots/{id}/reviews) ----------
+
+data class ReviewInDto(
+    val stars: Int,
+    val text: String,
+)
+
+data class ReviewCreatedDto(
+    val spotId: String,
+    val stars: Int,
+    val text: String,
+    val rating: Double,
+    val totalReviews: Int,
+)
+
+// ---------- BQ6: menor espera + compatibilidad con el perfil (GET /recommendations/best-for-you) ----------
+
+data class BestForYouSpotDto(
+    val rank: Int,
+    val spotId: String,
+    val name: String,
+    val emoji: String,
+    val cuisine: String,
+    val rating: Double,
+    val isBudget: Boolean,
+    val isVegetarian: Boolean,
+    val isHighProtein: Boolean,
+    val waitMinutes: Int?,
+    val minutesAgo: Int?,
+    val isRecent: Boolean,
+    val recentReports: Int,
+    val waitScore: Int,
+    val tasteMatch: Int?,
+    val score: Double,
+)
+
+data class BestForYouDto(
+    val question: String,
+    val freshMinutes: Int,
+    val maxWaitMinutes: Int,
+    val personalized: Boolean,
+    val spots: List<BestForYouSpotDto>,
+)
+
 // ---------- Autenticacion (backend de Camilo: /api/v1/auth) ----------
 
 data class CredencialesDto(
@@ -172,4 +226,15 @@ data class NearbyPickDto(
     val longitude: Double,
     val distanceMeters: Int,
     val walkMinutes: Double,
+)
+
+// ---------- BQ5 (backend de Camilo): favoritos abiertos ahora y a <= 15 min caminando ----------
+
+data class NearbyFavoriteDto(
+    val id: String,
+    val name: String,
+    val emoji: String,
+    val distanceMeters: Int,
+    val walkMinutes: Double,
+    val closesAt: String,       // 'HH:MM' hora local en que cierra la franja abierta actual
 )

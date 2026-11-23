@@ -2,13 +2,16 @@ package com.example.frontend.data
 
 import android.content.Context
 import com.example.frontend.data.conectividad.MonitorConectividad
+import com.example.frontend.data.gusto.AlmacenGusto
 import com.example.frontend.data.local.BaseDatosLocal
 import com.example.frontend.data.remote.ApiClient
 import com.example.frontend.data.remote.CampusBitesApi
+import com.example.frontend.data.remote.InterceptorConectividad
 import com.example.frontend.data.remote.TokenActual
 import com.example.frontend.data.sesion.AlmacenSesion
 import com.example.frontend.data.sincronizacion.SincronizadorPendientes
 import com.example.frontend.data.sincronizacion.TrabajoSincronizacion
+import com.example.frontend.data.telemetry.TelemetriaCargas
 import com.example.frontend.data.ubicacion.ProveedorUbicacion
 import com.example.frontend.data.ubicacion.UbicacionGps
 import java.io.File
@@ -28,6 +31,10 @@ object Dependencias {
         private set
     lateinit var almacenSesion: AlmacenSesion
         private set
+    lateinit var almacenGusto: AlmacenGusto
+        private set
+    lateinit var favoritos: FavoritosRepository
+        private set
     lateinit var proveedorUbicacion: ProveedorUbicacion
         private set
     lateinit var carpetaArchivos: File
@@ -42,9 +49,27 @@ object Dependencias {
     fun iniciar(context: Context) {
         appContext = context.applicationContext
         baseDatos = BaseDatosLocal.crear(appContext)
-        monitorConectividad = MonitorConectividad(appContext)
-        sincronizador = SincronizadorPendientes(api, baseDatos.pendientesDao())
+        monitorConectividad = MonitorConectividad(appContext, scopeApp)
+        // Cada peticion de Retrofit le cuenta al monitor si llego o si fallo por red.
+        InterceptorConectividad.alFallar = monitorConectividad::avisarFallaDeRed
+        InterceptorConectividad.alResponder = monitorConectividad::avisarRespuesta
         almacenSesion = AlmacenSesion(appContext)
+        almacenGusto = AlmacenGusto(appContext)
+        favoritos = FavoritosRepository(
+            api,
+            baseDatos.favoritosDao(),
+            almacenGusto,
+            telemetria = TelemetriaCargas(baseDatos.pendientesDao()),
+            alEncolar = ::programarSincronizacion,
+        )
+        sincronizador = SincronizadorPendientes(
+            api,
+            baseDatos.pendientesDao(),
+            baseDatos.resenasPendientesDao(),
+            tokenGuardado = { almacenSesion.actual()?.takeIf { !it.vencida() }?.token },
+            favoritos = favoritos,
+            usuarioGuardado = { almacenSesion.actual()?.takeIf { !it.vencida() }?.userId },
+        )
         proveedorUbicacion = ProveedorUbicacion(UbicacionGps(appContext))
         carpetaArchivos = appContext.filesDir
         // Si el backend responde 401 (token vencido o contrasena cambiada), se borra la sesion guardada.

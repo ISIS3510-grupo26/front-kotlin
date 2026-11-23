@@ -1,6 +1,8 @@
 package com.example.frontend.ui
 
 import android.os.SystemClock
+import android.os.Trace
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -47,6 +49,12 @@ import com.example.frontend.data.local.ResenaPendienteEntidad
 import com.example.frontend.model.SitioMejorParaTi
 import com.example.frontend.model.TasteProfile
 import com.example.frontend.model.rankearMejorParaTi
+import com.example.frontend.model.armarSpotsParaUi
+import com.example.frontend.data.AbiertosCercaRepository
+import com.example.frontend.data.FavoritosRepository
+import com.example.frontend.data.OrigenAbiertos
+import com.example.frontend.model.AbiertoCerca
+import java.io.IOException
 
 data class EstadoDetalle(
     val spot: Spot,
@@ -79,6 +87,17 @@ data class EstadoMejorParaTi(
     val aviso: String? = null,           // p. ej. "Offline · using wait times saved on this phone"
 )
 
+// BQ5 "Open near you" (Sprint 4): favoritos abiertos ahora y a <= 15 min caminando.
+data class EstadoAbiertosCerca(
+    val lista: List<AbiertoCerca> = emptyList(),
+    val cargando: Boolean = false,
+    val error: String? = null,
+    val aviso: String? = null,           // p. ej. "Offline · opening hours saved 20 min ago"
+    val conGps: Boolean = false,         // false = se uso el centro del campus
+    val cargadoUnaVez: Boolean = false,
+    val origen: OrigenAbiertos? = null,
+)
+
 // Estado de la feature "Popular right now" (respuesta de la BQ3 para la hora actual del celular).
 data class EstadoPopularidad(
     val ahora: RankingHora? = null,
@@ -101,6 +120,9 @@ class CampusBitesViewModel(
     private val almacenGusto: AlmacenGusto = Dependencias.almacenGusto,
     private val mejorParaTiRepository: MejorParaTiRepository = MejorParaTiRepository(ApiClient.api),
     private val resenasRepository: ResenasRepository = ResenasRepository(),
+    private val favoritosRepository: FavoritosRepository = Dependencias.favoritos,
+    private val abiertosRepository: AbiertosCercaRepository =
+        AbiertosCercaRepository(ApiClient.api, Dependencias.baseDatos.favoritosDao(), Dependencias.almacenGusto),
 ) : ViewModel() {
 
     // Los guardados viven en DataStore (sobreviven a cerrar la app). Mientras se leen, y si el estudiante
@@ -119,19 +141,23 @@ class CampusBitesViewModel(
     var mejorParaTi by mutableStateOf(EstadoMejorParaTi())
         private set
 
-    // spotId -> compatibilidad con el perfil, sacada del ultimo ranking de la BQ6.
-    private val compatibilidades: Map<String, Int>
-        get() = mejorParaTi.lista.associate { it.candidato.spotId to it.compatibilidad }
-
-    // affinityPercent deja de ser el numero escrito a mano en el catalogo: es la compatibilidad real.
+    // affinityPercent deja de ser el numero escrito a mano en el catalogo: es la compatibilidad real (BQ6).
     // Mientras el primer ranking no ha terminado se calcula directo con el perfil (son 7 restaurantes).
-    val spots: List<Spot>
-        get() = catalogo.map { spot ->
-            spot.conResenasLocales().copy(
-                isSaved = spot.id in savedIds,
-                affinityPercent = compatibilidades[spot.id] ?: perfilGusto.compatibilidad(spot),
-            )
+    //
+    // Micro-optimizacion (Sprint 4): antes era un getter y la lista entera se volvia a armar en cada lectura
+    // (cada recomposicion de la pantalla principal y cada buscarSitio al tocar una tarjeta): unas 25 veces
+    // en un recorrido corto aunque nada hubiera cambiado. Con derivedStateOf se arma solo cuando cambia algo
+    // de lo que lee (catalogo, corazones, ranking, perfil o reseñas locales); las demas lecturas devuelven la
+    // misma lista ya hecha. El armado en si esta en armarSpotsParaUi (sin objetos de mas dentro del loop).
+    // La seccion de Trace aparece con ese nombre en el System Trace del profiler de Android Studio.
+    val spots: List<Spot> by derivedStateOf {
+        Trace.beginSection("CampusBites#spots")
+        try {
+            armarSpotsParaUi(catalogo, savedIds, mejorParaTi.lista, perfilGusto, resenasLocales)
+        } finally {
+            Trace.endSection()
         }
+    }
 
     var cargandoLista by mutableStateOf(true)
         private set
@@ -163,6 +189,17 @@ class CampusBitesViewModel(
     var recomendaciones by mutableStateOf(EstadoRecomendaciones())
         private set
 
+    var abiertosCerca by mutableStateOf(EstadoAbiertosCerca())
+        private set
+
+    // Cambios de favoritos que todavia no llegan al servidor (Room). La pantalla dice "N waiting to sync".
+    var favoritosPendientes by mutableStateOf(0)
+        private set
+
+    private var usuarioFavoritos: String? = null
+    private var sincronizacionFavoritos: Job? = null
+    private var abiertosJob: Job? = null
+    private var pendientesJob: Job? = null
     private var detalleJob: Job? = null
     private var recomendacionesJob: Job? = null
     private var mejorParaTiJob: Job? = null
@@ -318,6 +355,10 @@ class CampusBitesViewModel(
         if (actual != null && (actual.error != null || actual.aviso != null)) reintentarDetalle()
         if (popularidad.error) cargarPopularidad(forzar = true)
         cargarTiemposEspera()
+        if (sesion != null) {
+            sincronizarFavoritos()
+            if (abiertosCerca.origen == OrigenAbiertos.COPIA_LOCAL || abiertosCerca.error != null) cargarAbiertosCerca(forzar = true)
+        }
         Dependencias.programarSincronizacion()
     }
 
@@ -341,10 +382,19 @@ class CampusBitesViewModel(
 
     fun estaGuardado(id: String) = id in savedIds
 
+    // El corazon cambia al instante (DataStore, sin red). Con sesion el cambio ademas entra a la cola de
+    // Room y se envia a la cuenta: ahora o, sin red, cuando vuelva la conexion.
     fun marcarGuardado(id: String) {
-        val nuevos = if (id in savedIds) savedIds - id else savedIds + id
+        val guardar = id !in savedIds
+        val nuevos = if (guardar) savedIds + id else savedIds - id
         savedIds = nuevos
-        viewModelScope.launch { almacenGusto.guardarFavoritos(nuevos) }
+        // Quitarlo desde "Open near you" lo saca de la lista de una vez.
+        if (!guardar) abiertosCerca = abiertosCerca.copy(lista = abiertosCerca.lista.filter { it.spotId != id })
+        val usuario = sesion?.userId
+        viewModelScope.launch {
+            almacenGusto.guardarFavoritos(nuevos)
+            if (usuario != null) favoritosRepository.cambiar(usuario, id, guardar)
+        }
     }
 
     fun buscarSitio(id: String): Spot? = spots.firstOrNull { it.id == id }
@@ -469,7 +519,17 @@ class CampusBitesViewModel(
                 if (guardada != null && !guardada.vencida()) TokenActual.valor = guardada.token
                 val antes = sesion
                 sesion = guardada
-                if (guardada == null && antes != null) recomendaciones = EstadoRecomendaciones()
+                if (guardada == null && antes != null) {
+                    recomendaciones = EstadoRecomendaciones()
+                    abiertosCerca = EstadoAbiertosCerca()
+                }
+                // Con su propia marca y no con `antes`: restaurarSesion() puede poner la sesion antes de que
+                // llegue aqui, y aun asi los favoritos se tienen que sincronizar al abrir la app.
+                if (guardada?.userId != usuarioFavoritos) {
+                    usuarioFavoritos = guardada?.userId
+                    observarFavoritosPendientes(guardada?.userId)
+                    if (guardada != null) sincronizarFavoritos()
+                }
                 if (guardada != null && antes?.userId != guardada.userId) {
                     cargarRecomendaciones()
                     // Las reseñas que se escribieron sin sesion ya tienen a nombre de quien publicarse.
@@ -507,8 +567,10 @@ class CampusBitesViewModel(
         viewModelScope.launch {
             sesionRepository.cerrarSesion()
             recomendacionesRepository.olvidar()
+            abiertosRepository.olvidar()
             sesion = null
             recomendaciones = EstadoRecomendaciones()
+            abiertosCerca = EstadoAbiertosCerca()
         }
     }
 
@@ -555,9 +617,90 @@ class CampusBitesViewModel(
     // La UI avisa cuando el estudiante responde el permiso de ubicacion: se recalcula con la estrategia nueva.
     fun alCambiarPermisoUbicacion() {
         if (sesion != null) cargarRecomendaciones(forzar = true)
+        if (sesion != null && abiertosCerca.cargadoUnaVez) cargarAbiertosCerca(forzar = true)
+    }
+
+    // ---------- Sprint 4: favoritos en la cuenta (BQ7) y BQ5 "Open near you" ----------
+
+    // Trae los favoritos de la cuenta y los mezcla con los cambios que siguen en la cola. Sin red no pasa
+    // nada: el celular sigue con su copia en DataStore y la cola espera.
+    private fun sincronizarFavoritos() {
+        val usuario = sesion?.userId ?: return
+        if (sincronizacionFavoritos?.isActive == true) return
+        val enPantalla = savedIds
+        sincronizacionFavoritos = viewModelScope.launch {
+            try {
+                val ids = favoritosRepository.sincronizar(usuario, enPantalla)
+                if (sesion?.userId == usuario) {
+                    savedIds = ids
+                    almacenGusto.guardarFavoritos(ids)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Sin red o servidor caido: se reintenta al volver la conexion.
+            }
+        }
+    }
+
+    private fun observarFavoritosPendientes(userId: String?) {
+        pendientesJob?.cancel()
+        favoritosPendientes = 0
+        if (userId == null) return
+        pendientesJob = viewModelScope.launch {
+            favoritosRepository.contarPendientes(userId).collect { favoritosPendientes = it }
+        }
+    }
+
+    // Multi-threading: la corrutina arranca en Main (viewModelScope). Adentro, withContext(IO) lanza dos
+    // corrutinas hijas en paralelo: leer la ubicacion (puede tardar varios segundos con el GPS) y dejar al
+    // servidor al dia con los favoritos: esperar (join) la sincronizacion si justo esta corriendo, por
+    // ejemplo recien iniciada la sesion, y enviar la cola. Las dos tienen que terminar antes de preguntar:
+    // la BQ5 se responde con los favoritos que tiene el servidor, asi que primero tienen que llegar.
+    // El repositorio pasa a Default para convertir y filtrar, y cada asignacion de estado vuelve a Main.
+    fun cargarAbiertosCerca(forzar: Boolean = false) {
+        val usuario = sesion?.userId ?: return
+        abiertosJob?.cancel()
+        abiertosCerca = abiertosCerca.copy(cargando = true, error = null)
+        val coordenadas = catalogo.mapNotNull { s -> s.latitude?.let { lat -> s.longitude?.let { lng -> s.id to (lat to lng) } } }.toMap()
+        abiertosJob = viewModelScope.launch {
+            val punto = withContext(Dispatchers.IO) {
+                val lecturaUbicacion = async { ubicacion.obtener() }
+                val servidorAlDia = async {
+                    sincronizacionFavoritos?.join()
+                    if (hayConexion) favoritosRepository.enviarPendientes(usuario)
+                }
+                servidorAlDia.await()
+                lecturaUbicacion.await()
+            }
+            val conGps = punto.origen == OrigenUbicacion.GPS
+            abiertosCerca = try {
+                // forzar si se acaban de enviar cambios no hace falta: la clave del cache incluye los favoritos.
+                // Los favoritos se leen aqui y no antes del launch: la sincronizacion de arriba pudo cambiarlos.
+                val resultado = abiertosRepository.cargar(usuario, punto, savedIds, coordenadas, forzar)
+                val hace = textoHaceCuanto(((System.currentTimeMillis() - resultado.guardadoEn) / 60_000L).toInt())
+                val aviso = when {
+                    resultado.origen == OrigenAbiertos.COPIA_LOCAL ->
+                        "Offline · opening hours saved $hace. Places that opened since then won't show."
+                    // Del cache en memoria sin red: los datos son buenos (no han vencido), pero se dice de cuando son.
+                    resultado.origen == OrigenAbiertos.MEMORIA && !hayConexion -> "Offline · checked $hace"
+                    else -> null
+                }
+                EstadoAbiertosCerca(resultado.lista, conGps = conGps, cargadoUnaVez = true, aviso = aviso, origen = resultado.origen)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                EstadoAbiertosCerca(
+                    conGps = conGps,
+                    cargadoUnaVez = true,
+                    error = if (e is IOException) MENSAJE_ABIERTOS_OFFLINE else "Couldn't check which saved places are open. Try again.",
+                )
+            }
+        }
     }
 
     private companion object {
+        const val MENSAJE_ABIERTOS_OFFLINE = "You're offline and this phone has no saved opening hours yet. They'll load when you reconnect."
         const val MENSAJE_LOGIN_OFFLINE = "You're offline. Signing in needs a connection; you can keep browsing meanwhile."
         const val MENSAJE_PICKS_OFFLINE = "You're offline. Picks near you will load when you reconnect."
         const val MENSAJE_MEJOR_PARA_TI_OFFLINE = "Offline · using the wait times saved on this phone"
