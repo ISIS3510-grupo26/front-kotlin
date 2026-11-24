@@ -53,6 +53,7 @@ import com.example.frontend.ui.screens.PantallaDetalle
 import com.example.frontend.ui.screens.PantallaLogin
 import com.example.frontend.ui.screens.PantallaEscribirResena
 import com.example.frontend.ui.screens.PantallaAbiertosCerca
+import com.example.frontend.ui.screens.PantallaMejorHora
 import com.example.frontend.ui.screens.PantallaGuardados
 import com.example.frontend.ui.screens.PantallaMapa
 import com.example.frontend.ui.screens.PantallaParaTi
@@ -121,6 +122,9 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
     var viendoPopularidad by remember { mutableStateOf(false) }
     var mostrandoLogin by remember { mutableStateOf(false) }
     var viendoAbiertosCerca by remember { mutableStateOf(false) }
+    // BQ8 "Best time to go": se abre desde el detalle (con ese restaurante abierto) o desde Profile (null).
+    var viendoMejorHora by remember { mutableStateOf(false) }
+    var spotMejorHora by remember { mutableStateOf<String?>(null) }
 
     // Permiso de ubicacion para BQ3. Si lo niega, la app sigue con la ubicacion del campus (Strategy).
     val pedirUbicacion = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -196,6 +200,23 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
         )
         return
     }
+    // Va antes del detalle: si se abrio desde un restaurante, atras vuelve a ese restaurante.
+    if (viendoMejorHora) {
+        BackHandler { viendoMejorHora = false }
+        PantallaMejorHora(
+            estado = viewModel.mejorHora,
+            catalogo = spots,
+            spotInicial = spotMejorHora,
+            alCargar = { dias, forzar -> viewModel.cargarMejorHora(dias, forzar) },
+            alAbrirSitio = { id ->
+                viendoMejorHora = false
+                abrirPorId(id)
+            },
+            alVolver = { viendoMejorHora = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
     if (detalle != null) {
         BackHandler { viewModel.cerrarDetalle() }
         PantallaDetalle(
@@ -212,6 +233,10 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
             tiempoEspera = viewModel.tiemposEspera[detalle.spot.id],
             hayConexion = viewModel.hayConexion,
             alReportarEspera = { minutos -> viewModel.reportarEspera(detalle.spot.id, minutos) },
+            alVerMejorHora = {
+                spotMejorHora = detalle.spot.id
+                viendoMejorHora = true
+            },
         )
         return
     }
@@ -327,6 +352,10 @@ private fun ContenidoPrincipal(viewModel: CampusBitesViewModel) {
                     correoSesion = viewModel.sesion?.email,
                     alIniciarSesion = { mostrandoLogin = true },
                     alCerrarSesion = viewModel::cerrarSesion,
+                    alVerMejorHora = {
+                        spotMejorHora = null
+                        viendoMejorHora = true
+                    },
                 )
             }
         }

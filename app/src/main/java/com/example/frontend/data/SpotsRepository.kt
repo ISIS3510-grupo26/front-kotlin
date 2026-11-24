@@ -46,14 +46,23 @@ class SpotsRepository(
     suspend fun listarSitios(): ResultadoLista = try {
         val dtos = api.listarSitios()
         val ahora = System.currentTimeMillis()
-        catalogo.reemplazarCatalogo(dtos.mapIndexed { i, dto -> SitioGuardadoEntidad(dto.id, i, gson.toJson(dto), ahora) })
+        // Micro-optimizacion (Sprint 4, Tomas): pasar los DTOs a JSON para guardarlos en Room corria en el hilo
+        // de la UI (despues de Retrofit la corrutina vuelve a Main) y lo bloqueaba 14-33 ms en el arranque, justo
+        // cuando se pinta el feed por primera vez. Es CPU puro: ahora va en Dispatchers.Default.
+        val filas = withContext(Dispatchers.Default) {
+            medir("serializarCatalogo") { dtos.mapIndexed { i, dto -> SitioGuardadoEntidad(dto.id, i, gson.toJson(dto), ahora) } }
+        }
+        catalogo.reemplazarCatalogo(filas)
         ResultadoLista(convertir(dtos), OrigenDatos.RED, ahora)
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         val guardados = catalogo.sitios()
         if (guardados.isNotEmpty()) {
-            val dtos = guardados.map { gson.fromJson(it.json, SpotDto::class.java) }
+            // Sin red pasa lo mismo al reves: leer el JSON de la copia tambien va fuera del hilo de la UI.
+            val dtos = withContext(Dispatchers.Default) {
+                medir("leerCatalogoGuardado") { guardados.map { gson.fromJson(it.json, SpotDto::class.java) } }
+            }
             ResultadoLista(convertir(dtos), OrigenDatos.COPIA_LOCAL, guardados.minOf { it.guardadoEn })
         } else {
             ResultadoLista(sampleSpots.map { it.copy(isSaved = false) }, OrigenDatos.CATALOGO_EMPAQUETADO)
@@ -64,7 +73,9 @@ class SpotsRepository(
     suspend fun obtenerSitio(id: String): Spot {
         val dto = api.obtenerSitio(id)
         val ahora = System.currentTimeMillis()
-        catalogo.guardarDetalle(DetalleGuardadoEntidad(id, gson.toJson(dto), ahora))
+        // Igual que el catalogo: el JSON del detalle (con menu y reseñas) se arma fuera del hilo de la UI.
+        val fila = withContext(Dispatchers.Default) { medir("serializarDetalle") { DetalleGuardadoEntidad(id, gson.toJson(dto), ahora) } }
+        catalogo.guardarDetalle(fila)
         val spot = withContext(Dispatchers.Default) { dto.toModel() }
         detallesEnMemoria.put(id, DetalleGuardado(spot, ahora))
         return spot

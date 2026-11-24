@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +80,7 @@ fun PantallaPerfil(
     correoSesion: String? = null,
     alIniciarSesion: () -> Unit = {},
     alCerrarSesion: () -> Unit = {},
+    alVerMejorHora: () -> Unit = {},
 ) {
     val unlocked = badges.count { it.unlocked }
     val context = LocalContext.current
@@ -155,6 +157,15 @@ fun PantallaPerfil(
                 modifier = Modifier.padding(top = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                // BQ8 (Sprint 4): a que hora ir a cada restaurante para hacer menos fila.
+                FilaOpcion(
+                    icon = Icons.Filled.Schedule,
+                    iconColor = AppColors.mint,
+                    iconBackground = AppColors.mintLight,
+                    title = "Best time to go",
+                    subtitle = "Shortest lines by hour, from student reports",
+                    alTocar = alVerMejorHora,
+                )
                 FilaOpcion(
                     icon = Icons.Filled.RestaurantMenu,
                     iconColor = AppColors.tomato,

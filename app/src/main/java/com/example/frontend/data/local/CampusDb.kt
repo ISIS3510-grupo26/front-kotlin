@@ -17,8 +17,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ResenaPendienteEntidad::class,
         FavoritoPendienteEntidad::class,
         AbiertoCercaEntidad::class,
+        EsperaPorHoraEntidad::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class BaseDatosLocal : RoomDatabase() {
@@ -26,11 +27,12 @@ abstract class BaseDatosLocal : RoomDatabase() {
     abstract fun pendientesDao(): PendientesDao
     abstract fun resenasPendientesDao(): ResenasPendientesDao
     abstract fun favoritosDao(): FavoritosDao
+    abstract fun esperasPorHoraDao(): EsperasPorHoraDao
 
     companion object {
         fun crear(context: Context): BaseDatosLocal =
             Room.databaseBuilder(context.applicationContext, BaseDatosLocal::class.java, "campusbites.db")
-                .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
+                .addMigrations(MIGRACION_1_2, MIGRACION_2_3, MIGRACION_3_4)
                 // Todo lo que hay aqui es copia del backend o cola reconstruible: si cambia el esquema se recrea.
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
@@ -61,6 +63,19 @@ abstract class BaseDatosLocal : RoomDatabase() {
                         "`nombre` TEXT NOT NULL, `emoji` TEXT NOT NULL, `lat` REAL NOT NULL, `lng` REAL NOT NULL, " +
                         "`metros` INTEGER NOT NULL, `minutos` INTEGER NOT NULL, `cierraA` TEXT NOT NULL, " +
                         "`cierraEnMillis` INTEGER NOT NULL, `guardadoEn` INTEGER NOT NULL, PRIMARY KEY(`spotId`))",
+                )
+            }
+        }
+
+        // Version 4 (Sprint 4, Tomas): esperas por hora de la BQ8 "Best time to go". Solo agrega una tabla,
+        // asi que se conservan las colas sin enviar (reseñas, reportes, favoritos, eventos).
+        private val MIGRACION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `esperas_por_hora` (`ventanaDias` INTEGER NOT NULL, `spotId` TEXT NOT NULL, " +
+                        "`nombre` TEXT NOT NULL, `emoji` TEXT NOT NULL, `hora` INTEGER NOT NULL, " +
+                        "`promedioMinutos` REAL NOT NULL, `reportes` INTEGER NOT NULL, `guardadoEn` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`ventanaDias`, `spotId`, `hora`))",
                 )
             }
         }

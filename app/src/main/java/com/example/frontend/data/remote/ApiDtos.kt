@@ -238,3 +238,24 @@ data class NearbyFavoriteDto(
     val walkMinutes: Double,
     val closesAt: String,       // 'HH:MM' hora local en que cierra la franja abierta actual
 )
+
+// BQ8 "Best time to go" (Sprint 4): GET /api/v1/analytics/best-time-to-go
+data class HourlyWaitDto(val hour: Int, val avgMinutes: Double, val reports: Int)
+
+data class BestTimeSpotDto(
+    val spotId: String,
+    val name: String,
+    val emoji: String,
+    val reports: Int,
+    val bestHour: Int?,
+    val worstHour: Int?,
+    val byHour: List<HourlyWaitDto>,
+)
+
+data class BestTimeToGoDto(
+    val question: String,
+    val days: Int,
+    val totalReports: Int,
+    val byHour: List<HourlyWaitDto>,
+    val spots: List<BestTimeSpotDto>,
+)

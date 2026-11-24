@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -82,6 +83,7 @@ fun PantallaDetalle(
     tiempoEspera: TiempoEspera? = null,
     hayConexion: Boolean = true,
     alReportarEspera: (minutos: Int) -> Unit = {},
+    alVerMejorHora: () -> Unit = {},
 ) {
     // El corazon sale del ViewModel (spot.isSaved), no de un estado local: antes se reiniciaba
     // al ir a escribir una reseña y volver.
@@ -143,6 +145,26 @@ fun PantallaDetalle(
                     hayConexion = hayConexion,
                     alReportar = alReportarEspera,
                 )
+                // BQ8 (Sprint 4): a que hora del dia la fila de este restaurante suele ser mas corta.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                        .background(AppColors.mintLight, RoundedCornerShape(14.dp))
+                        .clickable(onClick = alVerMejorHora)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("🕒", fontSize = 16.sp)
+                    Text(
+                        "  When is it calmer? See the best time to go",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.espresso,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = AppColors.muted)
+                }
                 Spacer(Modifier.size(22.dp))
             }
             // Mientras llega (o si falla) la info completa del backend, se muestra
